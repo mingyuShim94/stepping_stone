@@ -2,16 +2,32 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>자유 이동 데모</title>
 </head>
 <body>
     <div id="gameContainer">
         <div id="ui">
-            <div id="instructions">방향키(↑↓←→)로 이동, 스페이스바로 점프</div>
+            <div id="instructions" class="desktop-only">방향키(↑↓←→)로 이동, 스페이스바로 점프</div>
+            <div id="mobile-instructions" class="mobile-only">조이스틱으로 이동, 점프 버튼으로 점프</div>
             <div id="music-hint">키보드나 화면을 터치하면 배경음악이 시작됩니다</div>
         </div>
         <canvas id="gameCanvas"></canvas>
+        
+        <!-- 모바일 조이스틱 UI -->
+        <div id="mobile-controls" class="mobile-only">
+            <!-- 조이스틱 -->
+            <div id="joystick-container">
+                <div id="joystick-base">
+                    <div id="joystick-stick"></div>
+                </div>
+            </div>
+            
+            <!-- 점프 버튼 -->
+            <div id="jump-button">
+                <span>점프</span>
+            </div>
+        </div>
     </div>
 
     <script type="module" src="/src/main.js"></script>
