@@ -80,9 +80,20 @@ class FreeMovementGame {
 
   // 모바일 감지
   detectMobile() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-           ('ontouchstart' in window) ||
-           (navigator.maxTouchPoints > 0);
+    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const hasTouchStart = 'ontouchstart' in window;
+    const hasMaxTouchPoints = navigator.maxTouchPoints > 0;
+    const result = isMobileUA || hasTouchStart || hasMaxTouchPoints;
+    
+    console.log('모바일 감지 결과:', {
+      userAgent: navigator.userAgent,
+      isMobileUA,
+      hasTouchStart,
+      hasMaxTouchPoints,
+      result
+    });
+    
+    return result;
   }
 
   // 카메라 설정
@@ -197,6 +208,17 @@ class FreeMovementGame {
         this.screamSound.setAttribute('playsinline', 'true');
       }
 
+      // 점프 웃음 소리 설정
+      this.laughSound = new Audio('/music/laugh.mp3');
+      this.laughSound.volume = 0.5;
+      this.laughSound.preload = 'metadata';
+      
+      if (this.isMobile) {
+        this.laughSound.playsInline = true;
+        this.laughSound.setAttribute('webkit-playsinline', 'true');
+        this.laughSound.setAttribute('playsinline', 'true');
+      }
+
       // 오디오 이벤트 리스너
       this.bgMusic.addEventListener('canplaythrough', () => {
         console.log('배경음악 로딩 완료');
@@ -209,6 +231,15 @@ class FreeMovementGame {
       this.bgMusic.addEventListener('error', (e) => {
         console.error('배경음악 로딩 오류:', e);
         this.handleAudioError();
+      });
+
+      // 웃음 소리 이벤트 리스너
+      this.laughSound.addEventListener('canplaythrough', () => {
+        console.log('웃음 소리 로딩 완료');
+      });
+
+      this.laughSound.addEventListener('error', (e) => {
+        console.error('웃음 소리 로딩 오류:', e);
       });
 
       // iOS에서 중단된 오디오 재시작
@@ -520,6 +551,36 @@ class FreeMovementGame {
     this.isJumping = true;
     this.jumpVelocity = this.jumpHeight;
     console.log("점프!");
+    
+    // 점프 웃음 소리 재생
+    this.playLaughSound();
+  }
+
+  // 점프 웃음 소리 재생
+  playLaughSound() {
+    if (this.laughSound) {
+      try {
+        // 이전 재생을 중단하고 처음부터 재생
+        this.laughSound.currentTime = 0;
+        
+        // 클론을 사용하여 동시 재생 지원 (빠른 연속 점프)
+        const laughClone = this.laughSound.cloneNode();
+        laughClone.volume = this.laughSound.volume;
+        
+        laughClone.play().then(() => {
+          console.log('점프 웃음 소리 재생');
+        }).catch((error) => {
+          console.log('웃음 소리 재생 실패:', error);
+          
+          // 클론 재생이 실패하면 원본으로 시도
+          this.laughSound.play().catch(e => {
+            console.log('원본 웃음 소리도 재생 실패:', e);
+          });
+        });
+      } catch (error) {
+        console.error('웃음 소리 재생 오류:', error);
+      }
+    }
   }
 
   updateJump() {
@@ -600,18 +661,51 @@ class FreeMovementGame {
 
   // 조이스틱 이벤트 설정
   setupJoystickEvents() {
+    console.log('조이스틱 이벤트 설정 시작');
+    
     // DOM 요소가 로드될 때까지 기다림
+    let attemptCount = 0;
+    const maxAttempts = 50; // 5초까지 대기
+    
     const setupWhenReady = () => {
+      attemptCount++;
+      console.log(`조이스틱 DOM 요소 찾기 시도 ${attemptCount}/${maxAttempts}`);
+      
       const joystickBase = document.getElementById('joystick-base');
       const joystickStick = document.getElementById('joystick-stick');
       const jumpButton = document.getElementById('jump-button');
 
+      console.log('조이스틱 DOM 요소 상태:', {
+        joystickBase: !!joystickBase,
+        joystickStick: !!joystickStick,
+        jumpButton: !!jumpButton,
+        documentReady: document.readyState,
+        mobileControlsDisplay: document.getElementById('mobile-controls') ? 
+          window.getComputedStyle(document.getElementById('mobile-controls')).display : 'N/A',
+        joystickBaseDisplay: joystickBase ? 
+          window.getComputedStyle(joystickBase).display : 'N/A',
+        joystickBaseVisible: joystickBase ? 
+          window.getComputedStyle(joystickBase).visibility : 'N/A',
+        joystickBaseOpacity: joystickBase ? 
+          window.getComputedStyle(joystickBase).opacity : 'N/A'
+      });
+
       if (!joystickBase || !joystickStick || !jumpButton) {
-        // DOM이 아직 준비되지 않은 경우 100ms 후 재시도
-        setTimeout(setupWhenReady, 100);
-        return;
+        if (attemptCount < maxAttempts) {
+          // DOM이 아직 준비되지 않은 경우 100ms 후 재시도
+          setTimeout(setupWhenReady, 100);
+          return;
+        } else {
+          console.error('조이스틱 DOM 요소를 찾을 수 없습니다:', {
+            joystickBase,
+            joystickStick,
+            jumpButton
+          });
+          return;
+        }
       }
 
+      console.log('조이스틱 DOM 요소 발견, 이벤트 바인딩 시작');
       this.bindJoystickEvents(joystickBase, joystickStick, jumpButton);
     };
 
@@ -625,14 +719,29 @@ class FreeMovementGame {
 
     // 조이스틱 터치 시작
     const handleJoystickStart = (e) => {
+      console.log('조이스틱 터치 시작 이벤트:', e.type, e);
+      
       e.preventDefault();
       e.stopPropagation();
       
       const touch = e.touches ? e.touches[0] : e;
       const rect = joystickBase.getBoundingClientRect();
       
+      console.log('터치 정보:', {
+        touchType: e.touches ? 'touch' : 'mouse',
+        touchCount: e.touches ? e.touches.length : 1,
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        identifier: touch.identifier,
+        rect: rect,
+        active: this.joystick.active
+      });
+      
       // 이미 활성화된 조이스틱이 있으면 무시
-      if (this.joystick.active) return;
+      if (this.joystick.active) {
+        console.log('조이스틱이 이미 활성화됨, 무시');
+        return;
+      }
       
       this.joystick.active = true;
       this.joystickTouchId = touch.identifier || 'mouse';
@@ -641,7 +750,14 @@ class FreeMovementGame {
       this.joystick.currentX = touch.clientX;
       this.joystick.currentY = touch.clientY;
       
-      console.log('조이스틱 시작:', touch.clientX, touch.clientY);
+      console.log('조이스틱 활성화됨:', {
+        centerX: this.joystick.centerX,
+        centerY: this.joystick.centerY,
+        currentX: this.joystick.currentX,
+        currentY: this.joystick.currentY,
+        touchId: this.joystickTouchId
+      });
+      
       this.updateJoystickPosition();
       this.updateMovementFromJoystick();
     };
@@ -712,26 +828,42 @@ class FreeMovementGame {
 
     // 터치 이벤트 바인딩 (에러 처리 포함)
     try {
+      console.log('조이스틱 이벤트 바인딩 시작:', {
+        isMobile: this.isMobile,
+        joystickBase: !!joystickBase,
+        jumpButton: !!jumpButton
+      });
+      
       // 조이스틱 베이스에만 touchstart 이벤트 바인딩
       joystickBase.addEventListener('touchstart', handleJoystickStart, { passive: false });
+      console.log('조이스틱 touchstart 이벤트 바인딩됨');
       
       // 전역 touchmove와 touchend는 document에 바인딩
       document.addEventListener('touchmove', handleJoystickMove, { passive: false });
       document.addEventListener('touchend', handleJoystickEnd, { passive: false });
       document.addEventListener('touchcancel', handleJoystickEnd, { passive: false });
+      console.log('전역 터치 이벤트 바인딩됨');
       
       // 점프 버튼
       jumpButton.addEventListener('touchstart', handleJump, { passive: false });
       jumpButton.addEventListener('click', handleJump);
+      console.log('점프 버튼 이벤트 바인딩됨');
 
       // 마우스 이벤트 (데스크톱 테스트용)
       if (!this.isMobile) {
         joystickBase.addEventListener('mousedown', handleJoystickStart);
         document.addEventListener('mousemove', handleJoystickMove);
         document.addEventListener('mouseup', handleJoystickEnd);
+        console.log('마우스 이벤트 바인딩됨 (데스크톱)');
       }
 
       console.log('조이스틱 이벤트 바인딩 완료');
+      
+      // 테스트용 터치 확인
+      joystickBase.addEventListener('click', () => {
+        console.log('조이스틱 베이스 클릭됨 (테스트)');
+      });
+      
     } catch (error) {
       console.error('조이스틱 이벤트 바인딩 실패:', error);
     }

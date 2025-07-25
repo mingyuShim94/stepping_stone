@@ -42,6 +42,35 @@ window.addEventListener("DOMContentLoaded", () => {
     // 모바일 최적화 적용
     setupMobileOptimizations();
     
+    // 모바일 환경 디버깅 정보 출력
+    const isMobileDetected = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                            ('ontouchstart' in window) || 
+                            (navigator.maxTouchPoints > 0);
+    
+    console.log('DOM 로드 완료 - 환경 정보:', {
+      userAgent: navigator.userAgent,
+      isMobile: isMobileDetected,
+      screenSize: `${window.innerWidth}x${window.innerHeight}`,
+      touchSupport: 'ontouchstart' in window,
+      maxTouchPoints: navigator.maxTouchPoints,
+      hasPointerEvents: 'onpointerdown' in window
+    });
+    
+    // 조이스틱 DOM 요소 존재 확인
+    setTimeout(() => {
+      const mobileControls = document.getElementById('mobile-controls');
+      const joystickBase = document.getElementById('joystick-base');
+      const jumpButton = document.getElementById('jump-button');
+      
+      console.log('조이스틱 DOM 요소 확인:', {
+        mobileControls: !!mobileControls,
+        joystickBase: !!joystickBase,
+        jumpButton: !!jumpButton,
+        mobileControlsStyle: mobileControls ? window.getComputedStyle(mobileControls).display : 'N/A',
+        joystickBaseStyle: joystickBase ? window.getComputedStyle(joystickBase).display : 'N/A'
+      });
+    }, 500);
+    
     // 게임 시작
     const game = new FreeMovementGame();
     
