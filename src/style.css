@@ -65,7 +65,7 @@ body {
     pointer-events: none;
 }
 
-#music-hint {
+.music-hint {
     position: absolute;
     bottom: 50px;
     left: 50%;
@@ -75,7 +75,24 @@ body {
     text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
     text-align: center;
     pointer-events: none;
-    opacity: 0.8;
+    opacity: 0.9;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 8px 16px;
+    border-radius: 20px;
+    backdrop-filter: blur(5px);
+    animation: pulse 2s infinite;
+}
+
+.music-hint span {
+    display: inline-block;
+}
+
+@media (max-width: 768px) {
+    .music-hint {
+        bottom: 220px; /* 조이스틱 위에 위치 */
+        font-size: 12px;
+        padding: 6px 12px;
+    }
 }
 
 #gameOver {

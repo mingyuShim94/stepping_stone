@@ -166,47 +166,208 @@ class FreeMovementGame {
   }
 
   setupBackgroundMusic() {
-    // HTML5 Audio 요소 생성
-    this.bgMusic = new Audio('/music/bgm.mp3');
-    this.bgMusic.loop = true; // 반복 재생
-    this.bgMusic.volume = 0.3; // 볼륨 30%
-    this.bgMusic.preload = 'auto';
+    try {
+      // 오디오 컨텍스트 초기화 (모바일 호환성)
+      this.initAudioContext();
+      
+      // HTML5 Audio 요소 생성
+      this.bgMusic = new Audio('/music/bgm.mp3');
+      this.bgMusic.loop = true;
+      this.bgMusic.volume = 0.3;
+      this.bgMusic.preload = 'metadata';
+      
+      // 모바일 최적화 속성
+      if (this.isMobile) {
+        this.bgMusic.muted = false;
+        this.bgMusic.playsInline = true;
+        this.bgMusic.controls = false;
+        // iOS에서 중요한 속성
+        this.bgMusic.setAttribute('webkit-playsinline', 'true');
+        this.bgMusic.setAttribute('playsinline', 'true');
+      }
 
-    // 비명 소리 설정
-    this.screamSound = new Audio('/music/scream.mp3');
-    this.screamSound.volume = 0.7; // 볼륨 70% (더 크게)
-    this.screamSound.preload = 'auto';
+      // 비명 소리 설정
+      this.screamSound = new Audio('/music/scream.mp3');
+      this.screamSound.volume = 0.7;
+      this.screamSound.preload = 'metadata';
+      
+      if (this.isMobile) {
+        this.screamSound.playsInline = true;
+        this.screamSound.setAttribute('webkit-playsinline', 'true');
+        this.screamSound.setAttribute('playsinline', 'true');
+      }
 
-    // 첫 번째 사용자 상호작용 후 재생 시작
-    this.startMusicOnInteraction();
+      // 오디오 이벤트 리스너
+      this.bgMusic.addEventListener('canplaythrough', () => {
+        console.log('배경음악 로딩 완료');
+      });
+
+      this.bgMusic.addEventListener('loadeddata', () => {
+        console.log('배경음악 데이터 로딩 완료');
+      });
+
+      this.bgMusic.addEventListener('error', (e) => {
+        console.error('배경음악 로딩 오류:', e);
+        this.handleAudioError();
+      });
+
+      // iOS에서 중단된 오디오 재시작
+      this.bgMusic.addEventListener('pause', () => {
+        if (!this.bgMusic.ended && this.isMobile) {
+          console.log('음악이 일시정지됨, 재시도...');
+          setTimeout(() => {
+            if (this.bgMusic.paused) {
+              this.bgMusic.play().catch(e => console.log('재시작 실패:', e));
+            }
+          }, 100);
+        }
+      });
+
+      // 첫 번째 사용자 상호작용 후 재생 시작
+      this.startMusicOnInteraction();
+    } catch (error) {
+      console.error('음악 설정 실패:', error);
+      this.handleAudioError();
+    }
+  }
+
+  // 오디오 컨텍스트 초기화 (Web Audio API)
+  initAudioContext() {
+    try {
+      // 오디오 컨텍스트 생성 (모바일 브라우저 호환성)
+      window.AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (window.AudioContext) {
+        this.audioContext = new AudioContext();
+        console.log('오디오 컨텍스트 생성됨');
+      }
+    } catch (error) {
+      console.log('오디오 컨텍스트 생성 실패:', error);
+    }
+  }
+
+  // 오디오 오류 처리
+  handleAudioError() {
+    const musicHint = document.getElementById('music-hint');
+    if (musicHint) {
+      musicHint.innerHTML = '<span>🔇 배경음악을 불러올 수 없습니다</span>';
+      setTimeout(() => {
+        if (musicHint) musicHint.style.display = 'none';
+      }, 3000);
+    }
   }
 
   startMusicOnInteraction() {
-    const startMusic = () => {
-      if (this.bgMusic && this.bgMusic.paused) {
-        this.bgMusic.play().then(() => {
-          console.log('배경음악 재생 시작');
+    let musicStarted = false;
+    
+    const startMusic = async (eventType) => {
+      if (musicStarted) return;
+      
+      console.log(`음악 시작 시도 (${eventType})`);
+      
+      try {
+        // 오디오 컨텍스트가 suspended 상태라면 resume
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+          await this.audioContext.resume();
+          console.log('오디오 컨텍스트 재시작됨');
+        }
+        
+        if (this.bgMusic && this.bgMusic.paused) {
+          // 모바일에서 확실한 재생을 위해 볼륨 확인
+          if (this.bgMusic.volume === 0) {
+            this.bgMusic.volume = 0.3;
+          }
+          
+          // iOS에서 먼저 load 시도
+          if (this.isMobile && this.bgMusic.readyState < 2) {
+            this.bgMusic.load();
+            await new Promise(resolve => {
+              this.bgMusic.addEventListener('canplay', resolve, { once: true });
+              setTimeout(resolve, 1000); // 타임아웃
+            });
+          }
+          
+          await this.bgMusic.play();
+          musicStarted = true;
+          console.log('배경음악 재생 성공');
           
           // 음악 힌트 숨기기
           const musicHint = document.getElementById('music-hint');
           if (musicHint) {
             musicHint.style.display = 'none';
           }
-        }).catch((error) => {
-          console.log('음악 재생 실패:', error);
-        });
+          
+          // 성공시 이벤트 리스너 제거
+          this.removeAudioEventListeners();
+        }
+      } catch (error) {
+        console.error(`음악 재생 실패 (${eventType}):`, error);
+        
+        // 재시도 로직
+        if (!musicStarted && error.name === 'NotAllowedError') {
+          const musicHint = document.getElementById('music-hint');
+          if (musicHint) {
+            musicHint.innerHTML = '<span>🎵 화면을 한 번 더 터치하면 음악이 재생됩니다</span>';
+            musicHint.style.display = 'block';
+          }
+          
+          // 3초 후 다시 시도
+          setTimeout(() => {
+            if (!musicStarted && this.bgMusic) {
+              this.bgMusic.play().then(() => {
+                musicStarted = true;
+                console.log('배경음악 재시도 성공');
+                if (musicHint) musicHint.style.display = 'none';
+                this.removeAudioEventListeners();
+              }).catch(e => console.log('재시도 실패:', e));
+            }
+          }, 3000);
+        }
       }
-      
-      // 이벤트 리스너 제거 (한 번만 실행)
-      document.removeEventListener('keydown', startMusic);
-      document.removeEventListener('click', startMusic);
-      document.removeEventListener('touchstart', startMusic);
     };
 
-    // 사용자 상호작용 감지
-    document.addEventListener('keydown', startMusic);
-    document.addEventListener('click', startMusic);
-    document.addEventListener('touchstart', startMusic);
+    // 이벤트 리스너 제거 함수
+    this.removeAudioEventListeners = () => {
+      document.removeEventListener('keydown', this.keydownHandler);
+      document.removeEventListener('click', this.clickHandler);
+      document.removeEventListener('touchstart', this.touchstartHandler);
+      document.removeEventListener('touchend', this.touchendHandler);
+      
+      // 조이스틱 이벤트에도 음악 시작 추가
+      const joystickBase = document.getElementById('joystick-base');
+      const jumpButton = document.getElementById('jump-button');
+      if (joystickBase) {
+        joystickBase.removeEventListener('touchstart', this.joystickMusicHandler);
+      }
+      if (jumpButton) {
+        jumpButton.removeEventListener('touchstart', this.jumpMusicHandler);
+      }
+    };
+
+    // 이벤트 핸들러 함수들
+    this.keydownHandler = () => startMusic('keydown');
+    this.clickHandler = () => startMusic('click');
+    this.touchstartHandler = () => startMusic('touchstart');
+    this.touchendHandler = () => startMusic('touchend');
+    this.joystickMusicHandler = () => startMusic('joystick');
+    this.jumpMusicHandler = () => startMusic('jump');
+
+    // 모든 상호작용 이벤트에 리스너 추가
+    document.addEventListener('keydown', this.keydownHandler, { once: false });
+    document.addEventListener('click', this.clickHandler, { once: false });
+    document.addEventListener('touchstart', this.touchstartHandler, { once: false });
+    document.addEventListener('touchend', this.touchendHandler, { once: false });
+    
+    // 조이스틱과 점프 버튼에도 음악 시작 이벤트 추가
+    setTimeout(() => {
+      const joystickBase = document.getElementById('joystick-base');
+      const jumpButton = document.getElementById('jump-button');
+      if (joystickBase) {
+        joystickBase.addEventListener('touchstart', this.joystickMusicHandler, { once: false });
+      }
+      if (jumpButton) {
+        jumpButton.addEventListener('touchstart', this.jumpMusicHandler, { once: false });
+      }
+    }, 500);
   }
 
   createPlayer() {
@@ -459,30 +620,54 @@ class FreeMovementGame {
 
   // 조이스틱 이벤트 바인딩
   bindJoystickEvents(joystickBase, joystickStick, jumpButton) {
+    // 조이스틱 터치 ID 추적
+    this.joystickTouchId = null;
 
     // 조이스틱 터치 시작
     const handleJoystickStart = (e) => {
       e.preventDefault();
+      e.stopPropagation();
+      
       const touch = e.touches ? e.touches[0] : e;
       const rect = joystickBase.getBoundingClientRect();
       
+      // 이미 활성화된 조이스틱이 있으면 무시
+      if (this.joystick.active) return;
+      
       this.joystick.active = true;
+      this.joystickTouchId = touch.identifier || 'mouse';
       this.joystick.centerX = rect.left + rect.width / 2;
       this.joystick.centerY = rect.top + rect.height / 2;
       this.joystick.currentX = touch.clientX;
       this.joystick.currentY = touch.clientY;
       
+      console.log('조이스틱 시작:', touch.clientX, touch.clientY);
       this.updateJoystickPosition();
+      this.updateMovementFromJoystick();
     };
 
     // 조이스틱 터치 이동
     const handleJoystickMove = (e) => {
       if (!this.joystick.active) return;
       e.preventDefault();
+      e.stopPropagation();
       
-      const touch = e.touches ? e.touches[0] : e;
-      this.joystick.currentX = touch.clientX;
-      this.joystick.currentY = touch.clientY;
+      // 올바른 터치 찾기
+      let targetTouch = null;
+      if (e.touches) {
+        for (let touch of e.touches) {
+          if (touch.identifier === this.joystickTouchId) {
+            targetTouch = touch;
+            break;
+          }
+        }
+        if (!targetTouch) return; // 해당 터치가 없으면 무시
+      } else {
+        targetTouch = e; // 마우스 이벤트
+      }
+      
+      this.joystick.currentX = targetTouch.clientX;
+      this.joystick.currentY = targetTouch.clientY;
       
       this.updateJoystickPosition();
       this.updateMovementFromJoystick();
@@ -490,8 +675,24 @@ class FreeMovementGame {
 
     // 조이스틱 터치 종료
     const handleJoystickEnd = (e) => {
+      // 터치 종료시 해당 터치가 조이스틱 터치인지 확인
+      if (e.changedTouches) {
+        let isJoystickTouch = false;
+        for (let touch of e.changedTouches) {
+          if (touch.identifier === this.joystickTouchId) {
+            isJoystickTouch = true;
+            break;
+          }
+        }
+        if (!isJoystickTouch) return; // 다른 터치는 무시
+      }
+      
       e.preventDefault();
+      e.stopPropagation();
+      
+      console.log('조이스틱 종료');
       this.joystick.active = false;
+      this.joystickTouchId = null;
       
       // 조이스틱 중앙으로 복귀
       joystickStick.style.transform = 'translate(0px, 0px)';
@@ -511,19 +712,23 @@ class FreeMovementGame {
 
     // 터치 이벤트 바인딩 (에러 처리 포함)
     try {
+      // 조이스틱 베이스에만 touchstart 이벤트 바인딩
       joystickBase.addEventListener('touchstart', handleJoystickStart, { passive: false });
-      window.addEventListener('touchmove', handleJoystickMove, { passive: false });
-      window.addEventListener('touchend', handleJoystickEnd, { passive: false });
-      window.addEventListener('touchcancel', handleJoystickEnd, { passive: false });
       
+      // 전역 touchmove와 touchend는 document에 바인딩
+      document.addEventListener('touchmove', handleJoystickMove, { passive: false });
+      document.addEventListener('touchend', handleJoystickEnd, { passive: false });
+      document.addEventListener('touchcancel', handleJoystickEnd, { passive: false });
+      
+      // 점프 버튼
       jumpButton.addEventListener('touchstart', handleJump, { passive: false });
       jumpButton.addEventListener('click', handleJump);
 
       // 마우스 이벤트 (데스크톱 테스트용)
       if (!this.isMobile) {
         joystickBase.addEventListener('mousedown', handleJoystickStart);
-        window.addEventListener('mousemove', handleJoystickMove);
-        window.addEventListener('mouseup', handleJoystickEnd);
+        document.addEventListener('mousemove', handleJoystickMove);
+        document.addEventListener('mouseup', handleJoystickEnd);
       }
 
       console.log('조이스틱 이벤트 바인딩 완료');
@@ -563,35 +768,70 @@ class FreeMovementGame {
     const deltaY = this.joystick.currentY - this.joystick.centerY;
     const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
+    console.log('조이스틱 이동:', deltaX, deltaY, distance);
+
     // 데드존 (최소 움직임 거리)
-    if (distance < 15) {
-      this.keys.ArrowUp = false;
-      this.keys.ArrowDown = false;
-      this.keys.ArrowLeft = false;
-      this.keys.ArrowRight = false;
+    if (distance < 20) {
+      this.resetKeys();
       return;
     }
 
-    // 각도 계산 (8방향)
-    const angle = Math.atan2(deltaY, deltaX) * 180 / Math.PI;
-    const normalizedAngle = ((angle + 360) % 360);
+    // 각도 계산 (라디안을 도수로 변환)
+    let angle = Math.atan2(deltaY, deltaX) * 180 / Math.PI;
+    // 음수 각도를 양수로 변환 (0-360도)
+    if (angle < 0) angle += 360;
+
+    console.log('조이스틱 각도:', angle);
 
     // 모든 방향 초기화
+    this.resetKeys();
+
+    // 8방향 입력 처리 (수정된 각도 범위)
+    if (angle >= 337.5 || angle < 22.5) {
+      // 오른쪽 (0도)
+      this.keys.ArrowRight = true;
+      console.log('오른쪽 이동');
+    } else if (angle >= 22.5 && angle < 67.5) {
+      // 오른쪽 아래 (45도)
+      this.keys.ArrowRight = true;
+      this.keys.ArrowDown = true;
+      console.log('오른쪽 아래 이동');
+    } else if (angle >= 67.5 && angle < 112.5) {
+      // 아래 (90도)
+      this.keys.ArrowDown = true;
+      console.log('아래 이동');
+    } else if (angle >= 112.5 && angle < 157.5) {
+      // 왼쪽 아래 (135도)
+      this.keys.ArrowLeft = true;
+      this.keys.ArrowDown = true;
+      console.log('왼쪽 아래 이동');
+    } else if (angle >= 157.5 && angle < 202.5) {
+      // 왼쪽 (180도)
+      this.keys.ArrowLeft = true;
+      console.log('왼쪽 이동');
+    } else if (angle >= 202.5 && angle < 247.5) {
+      // 왼쪽 위 (225도)
+      this.keys.ArrowLeft = true;
+      this.keys.ArrowUp = true;
+      console.log('왼쪽 위 이동');
+    } else if (angle >= 247.5 && angle < 292.5) {
+      // 위 (270도)
+      this.keys.ArrowUp = true;
+      console.log('위 이동');
+    } else if (angle >= 292.5 && angle < 337.5) {
+      // 오른쪽 위 (315도)
+      this.keys.ArrowRight = true;
+      this.keys.ArrowUp = true;
+      console.log('오른쪽 위 이동');
+    }
+  }
+
+  // 모든 키 상태 초기화
+  resetKeys() {
     this.keys.ArrowUp = false;
     this.keys.ArrowDown = false;
     this.keys.ArrowLeft = false;
     this.keys.ArrowRight = false;
-
-    // 8방향 입력 처리
-    if (normalizedAngle >= 315 || normalizedAngle < 45) {
-      this.keys.ArrowRight = true; // 오른쪽
-    } else if (normalizedAngle >= 45 && normalizedAngle < 135) {
-      this.keys.ArrowDown = true; // 아래쪽
-    } else if (normalizedAngle >= 135 && normalizedAngle < 225) {
-      this.keys.ArrowLeft = true; // 왼쪽
-    } else if (normalizedAngle >= 225 && normalizedAngle < 315) {
-      this.keys.ArrowUp = true; // 위쪽
-    }
   }
 
   animate() {
