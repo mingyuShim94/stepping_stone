@@ -90,22 +90,33 @@ class FreeMovementGame {
     }
   }
 
-  // 통합 모바일 감지 (main.js와 동일한 로직)
+  // MDN 권장 방식의 모바일 감지 (main.js와 동일한 로직)
   detectMobile() {
-    const userAgentCheck = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const touchCheck = 'ontouchstart' in window;
-    const maxTouchPointsCheck = navigator.maxTouchPoints > 0;
-    const mediaQueryCheck = window.matchMedia('(max-width: 768px), (hover: none) and (pointer: coarse)').matches;
+    // 1차: 터치 이벤트 지원 확인
+    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    // 2차: 미디어 쿼리 기반 감지
+    const isSmallScreen = window.matchMedia('(max-width: 768px)').matches;
+    const isTouchDevice = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+    
+    // 3차: UserAgent 보조 확인
+    const userAgentMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    // 4차: 화면 방향 변경 이벤트 지원
+    const hasOrientationChange = 'orientation' in window;
+    
+    // 5차: body 클래스 확인 (main.js에서 설정)
     const bodyClassCheck = document.body.classList.contains('mobile-device');
     
-    const result = userAgentCheck || touchCheck || maxTouchPointsCheck || mediaQueryCheck || bodyClassCheck;
+    // 결합 로직
+    const result = hasTouch && (isSmallScreen || isTouchDevice || userAgentMobile || hasOrientationChange || bodyClassCheck);
     
-    console.log('모바일 감지 결과:', {
-      userAgent: navigator.userAgent,
-      userAgentCheck,
-      touchCheck,
-      maxTouchPointsCheck,
-      mediaQueryCheck,
+    console.log('게임 내 모바일 감지 결과:', {
+      hasTouch,
+      isSmallScreen,
+      isTouchDevice,
+      userAgentMobile,
+      hasOrientationChange,
       bodyClassCheck,
       result
     });
@@ -791,16 +802,19 @@ class FreeMovementGame {
   // 성능 모니터 토글
   togglePerformanceMonitor() {
     const monitor = document.getElementById('performance-monitor');
+    const debugInfo = document.getElementById('mobile-debug');
     if (!monitor) return;
 
     this.performanceMonitor.enabled = !this.performanceMonitor.enabled;
     
     if (this.performanceMonitor.enabled) {
       monitor.classList.remove('hidden');
-      console.log('성능 모니터 활성화');
+      debugInfo?.classList.remove('hidden');
+      console.log('성능 모니터 및 모바일 디버그 활성화');
     } else {
       monitor.classList.add('hidden');
-      console.log('성능 모니터 비활성화');
+      debugInfo?.classList.add('hidden');
+      console.log('성능 모니터 및 모바일 디버그 비활성화');
     }
   }
 
@@ -827,6 +841,7 @@ class FreeMovementGame {
     const fpsValue = document.getElementById('fps-value');
     const memoryValue = document.getElementById('memory-value');
     const renderInfo = document.getElementById('render-info');
+    const mobileStatus = document.getElementById('mobile-status');
 
     if (fpsValue) {
       const fps = this.performanceMonitor.fps;
@@ -870,6 +885,72 @@ class FreeMovementGame {
         renderInfo.classList.add('perf-warning');
       }
     }
+
+    // 모바일 상태 표시
+    if (mobileStatus) {
+      mobileStatus.textContent = this.isMobile ? '✓' : '✗';
+      mobileStatus.className = this.isMobile ? 'perf-value' : 'perf-critical';
+    }
+    
+    // 모바일 디버그 정보 업데이트
+    this.updateMobileDebugInfo();
+  }
+
+  // 모바일 디버그 정보 업데이트
+  updateMobileDebugInfo() {
+    const debugDetails = document.getElementById('debug-details');
+    if (!debugDetails) return;
+
+    // 현재 감지 상태 다시 확인
+    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isSmallScreen = window.matchMedia('(max-width: 768px)').matches;
+    const isTouchDevice = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+    const userAgentMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const hasOrientationChange = 'orientation' in window;
+    const bodyClassCheck = document.body.classList.contains('mobile-device');
+    
+    // 조이스틱 상태
+    const joystickVisible = !document.getElementById('mobile-controls').classList.contains('hidden');
+    const joystickActive = this.joystick ? this.joystick.active : false;
+
+    debugDetails.innerHTML = `
+      <div class="debug-item">
+        <span class="debug-label">터치 지원:</span>
+        <span class="debug-value ${hasTouch}">${hasTouch ? '✓' : '✗'}</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">작은 화면:</span>
+        <span class="debug-value ${isSmallScreen}">${isSmallScreen ? '✓' : '✗'}</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">터치 기기:</span>
+        <span class="debug-value ${isTouchDevice}">${isTouchDevice ? '✓' : '✗'}</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">UserAgent:</span>
+        <span class="debug-value ${userAgentMobile}">${userAgentMobile ? '✓' : '✗'}</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">방향 변경:</span>
+        <span class="debug-value ${hasOrientationChange}">${hasOrientationChange ? '✓' : '✗'}</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">CSS 클래스:</span>
+        <span class="debug-value ${bodyClassCheck}">${bodyClassCheck ? '✓' : '✗'}</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">최종 결과:</span>
+        <span class="debug-value ${this.isMobile}">${this.isMobile ? '모바일' : '데스크톱'}</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">조이스틱:</span>
+        <span class="debug-value ${joystickVisible}">${joystickVisible ? '표시됨' : '숨김'}</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">활성 상태:</span>
+        <span class="debug-value ${joystickActive}">${joystickActive ? '활성' : '비활성'}</span>
+      </div>
+    `;
   }
 
   // 조이스틱 이벤트 설정 (최적화됨)
@@ -902,12 +983,13 @@ class FreeMovementGame {
     setupWhenReady();
   }
 
-  // 조이스틱 이벤트 바인딩 (최적화됨)
+  // 조이스틱 이벤트 바인딩 (웹 표준 베스트 프랙티스 적용)
   bindJoystickEvents(joystickBase, joystickStick, jumpButton) {
-    // 조이스틱 터치 ID 추적
+    // 조이스틱 터치 ID 추적 (MDN 권장 방식)
     this.joystickTouchId = null;
+    this.activeTouch = null;
 
-    // 조이스틱 터치 시작 (성능 최적화)
+    // 조이스틱 터치 시작 (터치 식별자 추적 강화)
     const handleJoystickStart = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -917,40 +999,54 @@ class FreeMovementGame {
         return;
       }
       
+      // 터치 이벤트에서 첫 번째 터치 선택
       const touch = e.touches ? e.touches[0] : e;
       const rect = joystickBase.getBoundingClientRect();
       
+      // 터치 식별자 저장 (웹 표준 권장)
+      this.joystickTouchId = touch.identifier !== undefined ? touch.identifier : 'mouse';
+      this.activeTouch = touch;
+      
       this.joystick.active = true;
-      this.joystickTouchId = touch.identifier || 'mouse';
       this.joystick.centerX = rect.left + rect.width / 2;
       this.joystick.centerY = rect.top + rect.height / 2;
       this.joystick.currentX = touch.clientX;
       this.joystick.currentY = touch.clientY;
       
+      console.log('조이스틱 활성화 - 터치 ID:', this.joystickTouchId);
+      
       this.updateJoystickPosition();
       this.updateMovementFromJoystick();
     };
 
-    // 조이스틱 터치 이동
+    // 조이스틱 터치 이동 (터치 식별자 정확 추적)
     const handleJoystickMove = (e) => {
       if (!this.joystick.active) return;
       e.preventDefault();
       e.stopPropagation();
       
-      // 올바른 터치 찾기
+      // 정확한 터치 식별자로 해당 터치 찾기
       let targetTouch = null;
-      if (e.touches) {
-        for (let touch of e.touches) {
+      if (e.touches && this.joystickTouchId !== 'mouse') {
+        // 터치 이벤트에서 정확한 식별자로 매칭
+        for (let i = 0; i < e.touches.length; i++) {
+          const touch = e.touches[i];
           if (touch.identifier === this.joystickTouchId) {
             targetTouch = touch;
             break;
           }
         }
-        if (!targetTouch) return; // 해당 터치가 없으면 무시
+        
+        // 해당 터치가 없으면 무시 (다른 손가락의 터치)
+        if (!targetTouch) {
+          return;
+        }
       } else {
-        targetTouch = e; // 마우스 이벤트
+        // 마우스 이벤트 또는 터치 식별자가 mouse인 경우
+        targetTouch = e.touches ? e.touches[0] : e;
       }
       
+      // 조이스틱 위치 업데이트
       this.joystick.currentX = targetTouch.clientX;
       this.joystick.currentY = targetTouch.clientY;
       
@@ -958,30 +1054,41 @@ class FreeMovementGame {
       this.updateMovementFromJoystick();
     };
 
-    // 조이스틱 터치 종료 (최적화됨)
+    // 조이스틱 터치 종료 (터치 식별자 정확 추적)
     const handleJoystickEnd = (e) => {
-      // 터치 종료시 해당 터치가 조이스틱 터치인지 확인
-      if (e.changedTouches) {
+      // 터치 종료시 정확한 식별자로 해당 터치 확인
+      if (e.changedTouches && this.joystickTouchId !== 'mouse') {
         let isJoystickTouch = false;
-        for (let touch of e.changedTouches) {
+        
+        // 종료된 터치들 중에서 조이스틱 터치 찾기
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          const touch = e.changedTouches[i];
           if (touch.identifier === this.joystickTouchId) {
             isJoystickTouch = true;
             break;
           }
         }
-        if (!isJoystickTouch) return;
+        
+        // 조이스틱 터치가 아니면 무시
+        if (!isJoystickTouch) {
+          return;
+        }
       }
       
       e.preventDefault();
       e.stopPropagation();
       
+      console.log('조이스틱 비활성화 - 터치 ID:', this.joystickTouchId);
+      
+      // 조이스틱 상태 초기화
       this.joystick.active = false;
       this.joystickTouchId = null;
+      this.activeTouch = null;
       
-      // 조이스틱 중앙으로 복귀
+      // 조이스틱 시각적 중앙 복귀
       joystickStick.style.transform = 'translate(0px, 0px)';
       
-      // 모든 이동 정지
+      // 모든 이동 키 상태 초기화
       this.resetKeys();
     };
 

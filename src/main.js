@@ -1,14 +1,34 @@
 import "./style.css";
 import FreeMovementGame from "./game/StackGame.js";
 
-// 통합 모바일 감지 함수
+// MDN 권장 방식의 모바일 감지 함수
 function detectMobile() {
-  const userAgentCheck = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  const touchCheck = 'ontouchstart' in window;
-  const maxTouchPointsCheck = navigator.maxTouchPoints > 0;
-  const mediaQueryCheck = window.matchMedia('(max-width: 768px), (hover: none) and (pointer: coarse)').matches;
+  // 1차: 터치 이벤트 지원 확인 (가장 확실한 방법)
+  const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   
-  return userAgentCheck || touchCheck || maxTouchPointsCheck || mediaQueryCheck;
+  // 2차: 미디어 쿼리 기반 감지
+  const isSmallScreen = window.matchMedia('(max-width: 768px)').matches;
+  const isTouchDevice = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  
+  // 3차: UserAgent 보조 확인 (폴백용)
+  const userAgentMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  // 4차: 화면 방향 변경 이벤트 지원 (모바일 특성)
+  const hasOrientationChange = 'orientation' in window;
+  
+  // 결합 로직: 터치 지원 + (작은 화면 OR 터치 디바이스 OR UserAgent OR 방향 변경)
+  const isMobile = hasTouch && (isSmallScreen || isTouchDevice || userAgentMobile || hasOrientationChange);
+  
+  console.log('모바일 감지 상세 정보:', {
+    hasTouch,
+    isSmallScreen,
+    isTouchDevice,
+    userAgentMobile,
+    hasOrientationChange,
+    결과: isMobile
+  });
+  
+  return isMobile;
 }
 
 // 모바일 최적화 설정
@@ -18,6 +38,14 @@ function setupMobileOptimizations() {
   // body에 모바일 클래스 추가 (CSS와 연동)
   if (isMobile) {
     document.body.classList.add('mobile-device');
+  }
+  
+  // 폴백 안전장치: 768px 이하에서는 강제로 모바일 모드
+  const isSmallScreen = window.innerWidth <= 768;
+  if (isSmallScreen && !isMobile) {
+    console.log('폴백 안전장치 활성화: 작은 화면에서 모바일 모드 강제 적용');
+    document.body.classList.add('mobile-device');
+    return true; // 강제로 모바일로 인식
   }
   
   // 모바일 브라우저에서 스크롤 방지

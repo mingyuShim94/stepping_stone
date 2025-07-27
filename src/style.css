@@ -156,9 +156,24 @@ body {
     display: none;
 }
 
-/* JavaScript로 추가되는 모바일 클래스와 미디어 쿼리 결합 */
-.mobile-device .mobile-only,
-@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+/* JavaScript로 추가되는 모바일 클래스 */
+.mobile-device .mobile-only {
+    display: block !important;
+}
+
+/* 미디어 쿼리 기반 모바일 감지 (폴백 안전장치) */
+@media (max-width: 768px) {
+    .mobile-only {
+        display: block !important; /* 강제 표시 */
+    }
+    
+    .desktop-only {
+        display: none !important;
+    }
+}
+
+/* 터치 디바이스 감지 (hover 없는 디바이스) */
+@media (hover: none) and (pointer: coarse) {
     .mobile-only {
         display: block;
     }
@@ -215,6 +230,9 @@ body {
     position: relative;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     transition: all 0.2s ease;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 #joystick-base:active {
@@ -353,6 +371,29 @@ body {
     }
 }
 
+/* 추가 폴백 안전장치 - 작은 화면에서 강제 표시 */
+@media screen and (max-width: 480px) {
+    .mobile-only {
+        display: block !important;
+    }
+}
+
+/* 세로 모드 모바일에서 강제 표시 */
+@media screen and (max-width: 768px) and (orientation: portrait) {
+    .mobile-only {
+        display: block !important;
+    }
+}
+
+/* 매우 작은 화면 (핸드폰)에서 무조건 표시 */
+@media screen and (max-width: 414px) {
+    .mobile-only {
+        display: block !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+}
+
 /* 성능 모니터 */
 .performance-monitor {
     position: absolute;
@@ -403,5 +444,69 @@ body {
         font-size: 10px;
         padding: 6px 8px;
         min-width: 100px;
+    }
+}
+
+/* 모바일 디버그 정보 */
+.mobile-debug-info {
+    position: absolute;
+    top: max(200px, calc(var(--safe-area-inset-top) + 200px));
+    right: max(20px, var(--safe-area-inset-right));
+    background: rgba(0, 50, 100, 0.8);
+    color: #00aaff;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    padding: 10px;
+    border-radius: 5px;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(0, 170, 255, 0.3);
+    max-width: 300px;
+    z-index: 350;
+    user-select: none;
+    pointer-events: none;
+}
+
+.debug-title {
+    color: #ffffff;
+    font-weight: bold;
+    margin-bottom: 8px;
+    text-align: center;
+    border-bottom: 1px solid rgba(0, 170, 255, 0.3);
+    padding-bottom: 4px;
+}
+
+.debug-details {
+    line-height: 1.3;
+}
+
+.debug-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+}
+
+.debug-label {
+    color: #cccccc;
+    margin-right: 8px;
+}
+
+.debug-value {
+    color: #00ff88;
+}
+
+.debug-value.false {
+    color: #ff4444;
+}
+
+.debug-value.true {
+    color: #00ff00;
+}
+
+/* 모바일에서 디버그 정보 크기 조정 */
+@media (max-width: 480px) {
+    .mobile-debug-info {
+        font-size: 9px;
+        padding: 8px;
+        max-width: 250px;
     }
 }
