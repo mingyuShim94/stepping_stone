@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>자유 이동 데모</title>
 </head>
 <body>
@@ -13,11 +13,26 @@
             <div id="music-hint" class="music-hint">
                 <span>🎵 화면을 터치하면 배경음악이 시작됩니다</span>
             </div>
+            <!-- 성능 모니터 -->
+            <div id="performance-monitor" class="performance-monitor hidden">
+                <div class="perf-item">
+                    <span class="perf-label">FPS:</span>
+                    <span id="fps-value">60</span>
+                </div>
+                <div class="perf-item">
+                    <span class="perf-label">메모리:</span>
+                    <span id="memory-value">--</span>
+                </div>
+                <div class="perf-item">
+                    <span class="perf-label">렌더:</span>
+                    <span id="render-info">--</span>
+                </div>
+            </div>
         </div>
         <canvas id="gameCanvas"></canvas>
         
         <!-- 모바일 조이스틱 UI -->
-        <div id="mobile-controls" class="mobile-only force-mobile-debug">
+        <div id="mobile-controls" class="mobile-only">
             <!-- 조이스틱 -->
             <div id="joystick-container">
                 <div id="joystick-base">

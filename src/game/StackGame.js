@@ -35,21 +35,33 @@ class FreeMovementGame {
     this.bgMusic = null;
     this.screamSound = null;
 
-    // 조이스틱 관련
+    // 조이스틱 관련 (적응형 최대 거리)
     this.joystick = {
       active: false,
       centerX: 0,
       centerY: 0,
       currentX: 0,
       currentY: 0,
-      maxDistance: 50
+      get maxDistance() {
+        // 화면 크기에 비례한 최대 거리 (조이스틱 베이스 크기의 40%)
+        return Math.min(window.innerWidth, window.innerHeight) * 0.06;
+      }
     };
 
     // 모바일 감지
     this.isMobile = this.detectMobile();
 
+    // 성능 모니터링 변수
+    this.performanceMonitor = {
+      lastTime: performance.now(),
+      frameCount: 0,
+      fps: 60,
+      enabled: false
+    };
+
     this.init();
     this.setupEventListeners();
+    this.setupPerformanceMonitor();
     this.animate();
   }
 
@@ -78,18 +90,23 @@ class FreeMovementGame {
     }
   }
 
-  // 모바일 감지
+  // 통합 모바일 감지 (main.js와 동일한 로직)
   detectMobile() {
-    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const hasTouchStart = 'ontouchstart' in window;
-    const hasMaxTouchPoints = navigator.maxTouchPoints > 0;
-    const result = isMobileUA || hasTouchStart || hasMaxTouchPoints;
+    const userAgentCheck = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const touchCheck = 'ontouchstart' in window;
+    const maxTouchPointsCheck = navigator.maxTouchPoints > 0;
+    const mediaQueryCheck = window.matchMedia('(max-width: 768px), (hover: none) and (pointer: coarse)').matches;
+    const bodyClassCheck = document.body.classList.contains('mobile-device');
+    
+    const result = userAgentCheck || touchCheck || maxTouchPointsCheck || mediaQueryCheck || bodyClassCheck;
     
     console.log('모바일 감지 결과:', {
       userAgent: navigator.userAgent,
-      isMobileUA,
-      hasTouchStart,
-      hasMaxTouchPoints,
+      userAgentCheck,
+      touchCheck,
+      maxTouchPointsCheck,
+      mediaQueryCheck,
+      bodyClassCheck,
       result
     });
     
@@ -115,21 +132,52 @@ class FreeMovementGame {
     this.camera.updateProjectionMatrix();
   }
 
-  // 렌더러 설정
+  // 렌더러 설정 (모바일 최적화)
   setupRenderer(canvas) {
-    this.renderer = new THREE.WebGLRenderer({
+    // 모바일 렌더링 옵션 최적화
+    const rendererOptions = {
       canvas: canvas,
-      antialias: !this.isMobile,
       alpha: false,
+      premultipliedAlpha: false,
+      stencil: false,
+      preserveDrawingBuffer: false,
       powerPreference: this.isMobile ? 'low-power' : 'high-performance'
-    });
+    };
+
+    // 안티앨리어싱 설정
+    if (this.isMobile) {
+      // 모바일에서는 FXAA로 대체 (성능 향상)
+      rendererOptions.antialias = false;
+    } else {
+      rendererOptions.antialias = true;
+    }
+
+    this.renderer = new THREE.WebGLRenderer(rendererOptions);
     
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.isMobile ? 1.5 : 2));
+    // 모바일 최적화된 픽셀 비율
+    const pixelRatio = this.isMobile 
+      ? Math.min(window.devicePixelRatio, 1.5) 
+      : Math.min(window.devicePixelRatio, 2);
+    this.renderer.setPixelRatio(pixelRatio);
+    
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     
-    // 그림자 설정
+    // 그림자 설정 (모바일 최적화)
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = this.isMobile ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = this.isMobile 
+      ? THREE.BasicShadowMap 
+      : THREE.PCFSoftShadowMap;
+    
+    // 모바일 성능 최적화 설정
+    if (this.isMobile) {
+      this.renderer.shadowMap.autoUpdate = false; // 그림자 자동 업데이트 비활성화
+      this.renderer.info.autoReset = false; // 렌더링 정보 자동 리셋 비활성화
+    }
+    
+    // 렌더러 추가 최적화
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
   }
 
   // Fallback 게임 생성
@@ -140,40 +188,69 @@ class FreeMovementGame {
 
   setupLighting() {
     // 어두운 환경광
-    const ambientLight = new THREE.AmbientLight(0x1a1a2e, 0.3);
+    const ambientLight = new THREE.AmbientLight(0x1a1a2e, 0.4); // 약간 밝게 (그림자 품질 보상)
     this.scene.add(ambientLight);
 
-    // 위에서 아래로 비추는 극적인 조명
-    const directionalLight = new THREE.DirectionalLight(0xffffcc, 1.2);
+    // 위에서 아래로 비추는 극적인 조명 (모바일 최적화)
+    const directionalLight = new THREE.DirectionalLight(0xffffcc, this.isMobile ? 1.0 : 1.2);
     directionalLight.position.set(0, 20, 0);
     directionalLight.target.position.set(0, 0, 0);
     directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
+    
+    // 모바일 최적화된 그림자 맵 크기
+    const shadowMapSize = this.isMobile ? 1024 : 2048;
+    directionalLight.shadow.mapSize.width = shadowMapSize;
+    directionalLight.shadow.mapSize.height = shadowMapSize;
+    
+    // 그림자 카메라 설정
     directionalLight.shadow.camera.near = 0.5;
-    directionalLight.shadow.camera.far = 50;
-    directionalLight.shadow.camera.left = -20;
-    directionalLight.shadow.camera.right = 20;
-    directionalLight.shadow.camera.top = 20;
-    directionalLight.shadow.camera.bottom = -20;
+    directionalLight.shadow.camera.far = this.isMobile ? 30 : 50; // 모바일에서 범위 축소
+    directionalLight.shadow.camera.left = -15;
+    directionalLight.shadow.camera.right = 15;
+    directionalLight.shadow.camera.top = 15;
+    directionalLight.shadow.camera.bottom = -15;
+    
+    // 모바일에서 그림자 품질 조정
+    if (this.isMobile) {
+      directionalLight.shadow.radius = 2;
+      directionalLight.shadow.blurSamples = 4;
+    }
+    
     this.scene.add(directionalLight);
     this.scene.add(directionalLight.target);
+    
+    // 성능 모니터링을 위해 라이트 참조 저장
+    this.directionalLight = directionalLight;
   }
 
   createEnvironment() {
-    // 세로 방향 좁은 다리 생성
-    const bridgeGeometry = new THREE.PlaneGeometry(3, 50); // 폭 3, 길이 50
-    const bridgeMaterial = new THREE.MeshLambertMaterial({ 
-      color: 0x8B4513 // 갈색 나무색
-    });
+    // 세로 방향 좁은 다리 생성 (모바일 최적화)
+    const bridgeGeometry = new THREE.PlaneGeometry(3, 50);
+    
+    // 모바일에서는 Lambert 대신 Basic 머티리얼 사용 (성능 향상)
+    const bridgeMaterial = this.isMobile 
+      ? new THREE.MeshBasicMaterial({ 
+          color: 0x8B4513,
+          transparent: false,
+          fog: true
+        })
+      : new THREE.MeshLambertMaterial({ 
+          color: 0x8B4513
+        });
+    
     const bridge = new THREE.Mesh(bridgeGeometry, bridgeMaterial);
-    bridge.rotation.x = -Math.PI / 2; // 수평으로 눕히기
-    bridge.position.set(0, -0.1, -10); // 약간 아래에, 앞으로 뻗어나가게
-    bridge.receiveShadow = true;
+    bridge.rotation.x = -Math.PI / 2;
+    bridge.position.set(0, -0.1, -10);
+    bridge.receiveShadow = !this.isMobile; // 모바일에서는 그림자 수신 비활성화
     this.scene.add(bridge);
 
-    // 안개 효과로 깊이감 표현
-    this.scene.fog = new THREE.Fog(0x0a0a0a, 20, 100);
+    // 안개 효과 (모바일 최적화)
+    const fogNear = this.isMobile ? 15 : 20;
+    const fogFar = this.isMobile ? 80 : 100;
+    this.scene.fog = new THREE.Fog(0x0a0a0a, fogNear, fogFar);
+    
+    // 성능 참조 저장
+    this.bridge = bridge;
   }
 
   setupBackgroundMusic() {
@@ -451,27 +528,42 @@ class FreeMovementGame {
     if (!this.player) return;
 
     let isMoving = false;
+    let moveX = 0;
+    let moveZ = 0;
 
-    // 키보드 입력 처리
+    // 키 입력에 따른 방향 벡터 계산
     if (this.keys.ArrowUp) {
-      this.player.position.z -= this.moveSpeed;
+      moveZ -= 1;
       isMoving = true;
-      this.player.rotation.y = Math.PI;
     }
     if (this.keys.ArrowDown) {
-      this.player.position.z += this.moveSpeed;
+      moveZ += 1;
       isMoving = true;
-      this.player.rotation.y = 0;
     }
     if (this.keys.ArrowLeft) {
-      this.player.position.x -= this.moveSpeed;
+      moveX -= 1;
       isMoving = true;
-      this.player.rotation.y = -Math.PI / 2;
     }
     if (this.keys.ArrowRight) {
-      this.player.position.x += this.moveSpeed;
+      moveX += 1;
       isMoving = true;
-      this.player.rotation.y = Math.PI / 2;
+    }
+
+    // 벡터 정규화로 대각선 이동 속도 일정화
+    if (isMoving) {
+      const magnitude = Math.sqrt(moveX * moveX + moveZ * moveZ);
+      if (magnitude > 0) {
+        moveX = (moveX / magnitude) * this.moveSpeed;
+        moveZ = (moveZ / magnitude) * this.moveSpeed;
+        
+        // 실제 이동 적용
+        this.player.position.x += moveX;
+        this.player.position.z += moveZ;
+        
+        // 이동 방향에 따른 회전 (부드러운 회전)
+        const targetRotation = Math.atan2(moveX, moveZ);
+        this.player.rotation.y = targetRotation;
+      }
     }
 
     // 다리 위에 있는지 체크
@@ -659,89 +751,174 @@ class FreeMovementGame {
     }
   }
 
-  // 조이스틱 이벤트 설정
-  setupJoystickEvents() {
-    console.log('조이스틱 이벤트 설정 시작');
+  // 성능 모니터 설정
+  setupPerformanceMonitor() {
+    // 더블탭으로 성능 모니터 토글 (개발용)
+    let tapCount = 0;
+    let tapTimer = null;
     
-    // DOM 요소가 로드될 때까지 기다림
+    const handleDoubleTap = () => {
+      tapCount++;
+      
+      if (tapCount === 1) {
+        tapTimer = setTimeout(() => {
+          tapCount = 0;
+        }, 300);
+      } else if (tapCount === 2) {
+        clearTimeout(tapTimer);
+        tapCount = 0;
+        this.togglePerformanceMonitor();
+      }
+    };
+
+    // 상단 좌측 코너 터치로 성능 모니터 토글
+    const debugArea = document.getElementById('score');
+    if (debugArea) {
+      debugArea.addEventListener('click', handleDoubleTap);
+      debugArea.style.pointerEvents = 'auto';
+      debugArea.style.cursor = 'pointer';
+    }
+
+    // 키보드 단축키 (개발용)
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'F1' || (e.ctrlKey && e.key === 'p')) {
+        e.preventDefault();
+        this.togglePerformanceMonitor();
+      }
+    });
+  }
+
+  // 성능 모니터 토글
+  togglePerformanceMonitor() {
+    const monitor = document.getElementById('performance-monitor');
+    if (!monitor) return;
+
+    this.performanceMonitor.enabled = !this.performanceMonitor.enabled;
+    
+    if (this.performanceMonitor.enabled) {
+      monitor.classList.remove('hidden');
+      console.log('성능 모니터 활성화');
+    } else {
+      monitor.classList.add('hidden');
+      console.log('성능 모니터 비활성화');
+    }
+  }
+
+  // 성능 정보 업데이트
+  updatePerformanceMonitor() {
+    if (!this.performanceMonitor.enabled) return;
+
+    const currentTime = performance.now();
+    this.performanceMonitor.frameCount++;
+
+    // FPS 계산 (1초마다)
+    if (currentTime - this.performanceMonitor.lastTime >= 1000) {
+      this.performanceMonitor.fps = this.performanceMonitor.frameCount;
+      this.performanceMonitor.frameCount = 0;
+      this.performanceMonitor.lastTime = currentTime;
+
+      // UI 업데이트
+      this.updatePerformanceUI();
+    }
+  }
+
+  // 성능 UI 업데이트
+  updatePerformanceUI() {
+    const fpsValue = document.getElementById('fps-value');
+    const memoryValue = document.getElementById('memory-value');
+    const renderInfo = document.getElementById('render-info');
+
+    if (fpsValue) {
+      const fps = this.performanceMonitor.fps;
+      fpsValue.textContent = fps;
+      
+      // FPS 색상 변경
+      fpsValue.className = '';
+      if (fps < 20) {
+        fpsValue.classList.add('perf-critical');
+      } else if (fps < 40) {
+        fpsValue.classList.add('perf-warning');
+      }
+    }
+
+    if (memoryValue) {
+      const memory = this.checkMemoryUsage();
+      if (memory) {
+        memoryValue.textContent = memory.used;
+        
+        // 메모리 사용량에 따른 색상 변경
+        const usedMB = parseInt(memory.used);
+        memoryValue.className = '';
+        if (usedMB > 100) {
+          memoryValue.classList.add('perf-critical');
+        } else if (usedMB > 50) {
+          memoryValue.classList.add('perf-warning');
+        }
+      }
+    }
+
+    if (renderInfo && this.renderer) {
+      const info = this.renderer.info;
+      const triangles = info.render.triangles || 0;
+      renderInfo.textContent = `${triangles}T`;
+      
+      // 렌더링 부하에 따른 색상 변경
+      renderInfo.className = '';
+      if (triangles > 10000) {
+        renderInfo.classList.add('perf-critical');
+      } else if (triangles > 5000) {
+        renderInfo.classList.add('perf-warning');
+      }
+    }
+  }
+
+  // 조이스틱 이벤트 설정 (최적화됨)
+  setupJoystickEvents() {
+    // DOM 요소가 로드될 때까지 기다림 (최대 5초)
     let attemptCount = 0;
-    const maxAttempts = 50; // 5초까지 대기
+    const maxAttempts = 50;
     
     const setupWhenReady = () => {
       attemptCount++;
-      console.log(`조이스틱 DOM 요소 찾기 시도 ${attemptCount}/${maxAttempts}`);
       
       const joystickBase = document.getElementById('joystick-base');
       const joystickStick = document.getElementById('joystick-stick');
       const jumpButton = document.getElementById('jump-button');
 
-      console.log('조이스틱 DOM 요소 상태:', {
-        joystickBase: !!joystickBase,
-        joystickStick: !!joystickStick,
-        jumpButton: !!jumpButton,
-        documentReady: document.readyState,
-        mobileControlsDisplay: document.getElementById('mobile-controls') ? 
-          window.getComputedStyle(document.getElementById('mobile-controls')).display : 'N/A',
-        joystickBaseDisplay: joystickBase ? 
-          window.getComputedStyle(joystickBase).display : 'N/A',
-        joystickBaseVisible: joystickBase ? 
-          window.getComputedStyle(joystickBase).visibility : 'N/A',
-        joystickBaseOpacity: joystickBase ? 
-          window.getComputedStyle(joystickBase).opacity : 'N/A'
-      });
-
       if (!joystickBase || !joystickStick || !jumpButton) {
         if (attemptCount < maxAttempts) {
-          // DOM이 아직 준비되지 않은 경우 100ms 후 재시도
           setTimeout(setupWhenReady, 100);
           return;
         } else {
-          console.error('조이스틱 DOM 요소를 찾을 수 없습니다:', {
-            joystickBase,
-            joystickStick,
-            jumpButton
-          });
+          console.error('조이스틱 DOM 요소를 찾을 수 없습니다');
           return;
         }
       }
 
-      console.log('조이스틱 DOM 요소 발견, 이벤트 바인딩 시작');
+      console.log('조이스틱 이벤트 바인딩 시작');
       this.bindJoystickEvents(joystickBase, joystickStick, jumpButton);
     };
 
     setupWhenReady();
   }
 
-  // 조이스틱 이벤트 바인딩
+  // 조이스틱 이벤트 바인딩 (최적화됨)
   bindJoystickEvents(joystickBase, joystickStick, jumpButton) {
     // 조이스틱 터치 ID 추적
     this.joystickTouchId = null;
 
-    // 조이스틱 터치 시작
+    // 조이스틱 터치 시작 (성능 최적화)
     const handleJoystickStart = (e) => {
-      console.log('조이스틱 터치 시작 이벤트:', e.type, e);
-      
       e.preventDefault();
       e.stopPropagation();
       
-      const touch = e.touches ? e.touches[0] : e;
-      const rect = joystickBase.getBoundingClientRect();
-      
-      console.log('터치 정보:', {
-        touchType: e.touches ? 'touch' : 'mouse',
-        touchCount: e.touches ? e.touches.length : 1,
-        clientX: touch.clientX,
-        clientY: touch.clientY,
-        identifier: touch.identifier,
-        rect: rect,
-        active: this.joystick.active
-      });
-      
       // 이미 활성화된 조이스틱이 있으면 무시
       if (this.joystick.active) {
-        console.log('조이스틱이 이미 활성화됨, 무시');
         return;
       }
+      
+      const touch = e.touches ? e.touches[0] : e;
+      const rect = joystickBase.getBoundingClientRect();
       
       this.joystick.active = true;
       this.joystickTouchId = touch.identifier || 'mouse';
@@ -749,14 +926,6 @@ class FreeMovementGame {
       this.joystick.centerY = rect.top + rect.height / 2;
       this.joystick.currentX = touch.clientX;
       this.joystick.currentY = touch.clientY;
-      
-      console.log('조이스틱 활성화됨:', {
-        centerX: this.joystick.centerX,
-        centerY: this.joystick.centerY,
-        currentX: this.joystick.currentX,
-        currentY: this.joystick.currentY,
-        touchId: this.joystickTouchId
-      });
       
       this.updateJoystickPosition();
       this.updateMovementFromJoystick();
@@ -789,7 +958,7 @@ class FreeMovementGame {
       this.updateMovementFromJoystick();
     };
 
-    // 조이스틱 터치 종료
+    // 조이스틱 터치 종료 (최적화됨)
     const handleJoystickEnd = (e) => {
       // 터치 종료시 해당 터치가 조이스틱 터치인지 확인
       if (e.changedTouches) {
@@ -800,13 +969,12 @@ class FreeMovementGame {
             break;
           }
         }
-        if (!isJoystickTouch) return; // 다른 터치는 무시
+        if (!isJoystickTouch) return;
       }
       
       e.preventDefault();
       e.stopPropagation();
       
-      console.log('조이스틱 종료');
       this.joystick.active = false;
       this.joystickTouchId = null;
       
@@ -814,10 +982,7 @@ class FreeMovementGame {
       joystickStick.style.transform = 'translate(0px, 0px)';
       
       // 모든 이동 정지
-      this.keys.ArrowUp = false;
-      this.keys.ArrowDown = false;
-      this.keys.ArrowLeft = false;
-      this.keys.ArrowRight = false;
+      this.resetKeys();
     };
 
     // 점프 버튼
@@ -826,43 +991,28 @@ class FreeMovementGame {
       this.jump();
     };
 
-    // 터치 이벤트 바인딩 (에러 처리 포함)
+    // 터치 이벤트 바인딩 (최적화됨)
     try {
-      console.log('조이스틱 이벤트 바인딩 시작:', {
-        isMobile: this.isMobile,
-        joystickBase: !!joystickBase,
-        jumpButton: !!jumpButton
-      });
-      
-      // 조이스틱 베이스에만 touchstart 이벤트 바인딩
+      // 조이스틱 베이스에 터치 시작 이벤트
       joystickBase.addEventListener('touchstart', handleJoystickStart, { passive: false });
-      console.log('조이스틱 touchstart 이벤트 바인딩됨');
       
-      // 전역 touchmove와 touchend는 document에 바인딩
+      // 전역 터치 이동/종료 이벤트 (단일 리스너로 통합)
       document.addEventListener('touchmove', handleJoystickMove, { passive: false });
       document.addEventListener('touchend', handleJoystickEnd, { passive: false });
       document.addEventListener('touchcancel', handleJoystickEnd, { passive: false });
-      console.log('전역 터치 이벤트 바인딩됨');
       
       // 점프 버튼
       jumpButton.addEventListener('touchstart', handleJump, { passive: false });
       jumpButton.addEventListener('click', handleJump);
-      console.log('점프 버튼 이벤트 바인딩됨');
 
       // 마우스 이벤트 (데스크톱 테스트용)
       if (!this.isMobile) {
         joystickBase.addEventListener('mousedown', handleJoystickStart);
         document.addEventListener('mousemove', handleJoystickMove);
         document.addEventListener('mouseup', handleJoystickEnd);
-        console.log('마우스 이벤트 바인딩됨 (데스크톱)');
       }
 
       console.log('조이스틱 이벤트 바인딩 완료');
-      
-      // 테스트용 터치 확인
-      joystickBase.addEventListener('click', () => {
-        console.log('조이스틱 베이스 클릭됨 (테스트)');
-      });
       
     } catch (error) {
       console.error('조이스틱 이벤트 바인딩 실패:', error);
@@ -892,7 +1042,7 @@ class FreeMovementGame {
     }
   }
 
-  // 조이스틱 입력을 이동으로 변환
+  // 조이스틱 입력을 이동으로 변환 (성능 최적화)
   updateMovementFromJoystick() {
     if (!this.joystick.active) return;
 
@@ -900,61 +1050,42 @@ class FreeMovementGame {
     const deltaY = this.joystick.currentY - this.joystick.centerY;
     const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-    console.log('조이스틱 이동:', deltaX, deltaY, distance);
-
-    // 데드존 (최소 움직임 거리)
-    if (distance < 20) {
+    // 적응형 데드존 (화면 크기에 비례)
+    const deadzone = Math.min(window.innerWidth, window.innerHeight) * 0.03; // 화면 대각선의 3%
+    
+    if (distance < deadzone) {
       this.resetKeys();
       return;
     }
 
     // 각도 계산 (라디안을 도수로 변환)
     let angle = Math.atan2(deltaY, deltaX) * 180 / Math.PI;
-    // 음수 각도를 양수로 변환 (0-360도)
     if (angle < 0) angle += 360;
-
-    console.log('조이스틱 각도:', angle);
 
     // 모든 방향 초기화
     this.resetKeys();
 
-    // 8방향 입력 처리 (수정된 각도 범위)
+    // 8방향 입력 처리
     if (angle >= 337.5 || angle < 22.5) {
-      // 오른쪽 (0도)
       this.keys.ArrowRight = true;
-      console.log('오른쪽 이동');
     } else if (angle >= 22.5 && angle < 67.5) {
-      // 오른쪽 아래 (45도)
       this.keys.ArrowRight = true;
       this.keys.ArrowDown = true;
-      console.log('오른쪽 아래 이동');
     } else if (angle >= 67.5 && angle < 112.5) {
-      // 아래 (90도)
       this.keys.ArrowDown = true;
-      console.log('아래 이동');
     } else if (angle >= 112.5 && angle < 157.5) {
-      // 왼쪽 아래 (135도)
       this.keys.ArrowLeft = true;
       this.keys.ArrowDown = true;
-      console.log('왼쪽 아래 이동');
     } else if (angle >= 157.5 && angle < 202.5) {
-      // 왼쪽 (180도)
       this.keys.ArrowLeft = true;
-      console.log('왼쪽 이동');
     } else if (angle >= 202.5 && angle < 247.5) {
-      // 왼쪽 위 (225도)
       this.keys.ArrowLeft = true;
       this.keys.ArrowUp = true;
-      console.log('왼쪽 위 이동');
     } else if (angle >= 247.5 && angle < 292.5) {
-      // 위 (270도)
       this.keys.ArrowUp = true;
-      console.log('위 이동');
     } else if (angle >= 292.5 && angle < 337.5) {
-      // 오른쪽 위 (315도)
       this.keys.ArrowRight = true;
       this.keys.ArrowUp = true;
-      console.log('오른쪽 위 이동');
     }
   }
 
@@ -970,6 +1101,17 @@ class FreeMovementGame {
     requestAnimationFrame(() => this.animate());
 
     const deltaTime = this.clock.getDelta();
+    
+    // 성능 모니터 업데이트
+    this.updatePerformanceMonitor();
+    
+    // 모바일에서는 프레임 제한 (30fps)
+    if (this.isMobile) {
+      this.frameCounter = (this.frameCounter || 0) + 1;
+      if (this.frameCounter % 2 !== 0) {
+        return; // 매 두 번째 프레임만 렌더링
+      }
+    }
 
     // 애니메이션 믹서 업데이트
     if (this.mixer) {
@@ -982,9 +1124,150 @@ class FreeMovementGame {
     // 점프 업데이트
     this.updateJump();
 
+    // 모바일에서 필요할 때만 그림자 업데이트
+    if (this.isMobile && this.directionalLight && this.directionalLight.shadow) {
+      this.directionalLight.shadow.needsUpdate = this.player && this.player.position.y > 0.1;
+    }
+
     this.renderer.render(this.scene, this.camera);
   }
 
+  // 메모리 관리 및 리소스 정리
+  dispose() {
+    console.log('게임 리소스 정리 시작');
+    
+    try {
+      // 애니메이션 프레임 정리
+      if (this.animationId) {
+        cancelAnimationFrame(this.animationId);
+      }
+      
+      // Three.js 객체 정리
+      this.disposeThreeJSObjects();
+      
+      // 오디오 리소스 정리
+      this.disposeAudioResources();
+      
+      // 이벤트 리스너 정리
+      this.removeEventListeners();
+      
+      console.log('게임 리소스 정리 완료');
+    } catch (error) {
+      console.error('리소스 정리 중 오류:', error);
+    }
+  }
+  
+  // Three.js 객체 메모리 정리
+  disposeThreeJSObjects() {
+    // Scene 객체들 정리
+    if (this.scene) {
+      this.scene.traverse((child) => {
+        if (child.geometry) {
+          child.geometry.dispose();
+        }
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach(material => material.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+        if (child.texture) {
+          child.texture.dispose();
+        }
+      });
+      
+      this.scene.clear();
+    }
+    
+    // Renderer 정리
+    if (this.renderer) {
+      this.renderer.dispose();
+      this.renderer.forceContextLoss();
+      this.renderer.domElement = null;
+    }
+    
+    // 기타 객체 정리
+    if (this.mixer) {
+      this.mixer.stopAllAction();
+    }
+    
+    // 참조 제거
+    this.scene = null;
+    this.camera = null;
+    this.renderer = null;
+    this.player = null;
+    this.mixer = null;
+    this.walkAction = null;
+    this.directionalLight = null;
+    this.bridge = null;
+  }
+  
+  // 오디오 리소스 정리
+  disposeAudioResources() {
+    const audioElements = [this.bgMusic, this.screamSound, this.laughSound];
+    
+    audioElements.forEach(audio => {
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.src = '';
+        audio.load();
+      }
+    });
+    
+    // 오디오 컨텍스트 정리
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+    
+    // 참조 제거
+    this.bgMusic = null;
+    this.screamSound = null;
+    this.laughSound = null;
+  }
+  
+  // 이벤트 리스너 정리
+  removeEventListeners() {
+    // 키보드 이벤트 제거
+    window.removeEventListener('keydown', this.keydownHandler);
+    window.removeEventListener('keyup', this.keyupHandler);
+    window.removeEventListener('resize', this.resizeHandler);
+    
+    // 터치 이벤트 제거
+    if (this.isMobile) {
+      document.removeEventListener('touchmove', this.touchMoveHandler);
+      document.removeEventListener('touchend', this.touchEndHandler);
+      document.removeEventListener('touchcancel', this.touchEndHandler);
+    }
+    
+    // 오디오 관련 이벤트 제거
+    if (this.removeAudioEventListeners) {
+      this.removeAudioEventListeners();
+    }
+  }
+  
+  // 메모리 사용량 체크 (디버깅용)
+  checkMemoryUsage() {
+    if (performance.memory) {
+      const memory = performance.memory;
+      return {
+        used: Math.round(memory.usedJSHeapSize / 1048576) + ' MB',
+        total: Math.round(memory.totalJSHeapSize / 1048576) + ' MB',
+        limit: Math.round(memory.jsHeapSizeLimit / 1048576) + ' MB'
+      };
+    }
+    return null;
+  }
+
 }
+
+// 페이지 종료 시 자동 정리
+window.addEventListener('beforeunload', () => {
+  if (window.currentGame && typeof window.currentGame.dispose === 'function') {
+    window.currentGame.dispose();
+  }
+});
 
 export default FreeMovementGame;

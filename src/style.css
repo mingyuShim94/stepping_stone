@@ -44,13 +44,14 @@ body {
 
 #score {
     position: absolute;
-    top: 20px;
-    left: 20px;
+    top: max(20px, var(--safe-area-inset-top));
+    left: max(20px, var(--safe-area-inset-left));
     color: white;
     font-size: 24px;
     font-weight: bold;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
     pointer-events: none;
+    z-index: 200; /* 노치 위에 표시 */
 }
 
 #instructions {
@@ -155,12 +156,8 @@ body {
     display: none;
 }
 
-/* 강제 모바일 표시를 위한 디버깅 클래스 */
-.force-mobile-debug {
-    display: block !important;
-    border: 2px solid red !important;
-}
-
+/* JavaScript로 추가되는 모바일 클래스와 미디어 쿼리 결합 */
+.mobile-device .mobile-only,
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
     .mobile-only {
         display: block;
@@ -171,34 +168,40 @@ body {
     }
 }
 
-/* 모바일 환경 강제 표시 (디버깅용) */
-@media screen {
-    .debug-mobile .mobile-only {
-        display: block !important;
-        opacity: 0.8;
-        border: 1px dashed yellow;
-    }
+/* 모바일 디바이스 클래스가 있을 때 데스크톱 요소 숨기기 */
+.mobile-device .desktop-only {
+    display: none !important;
 }
 
-/* 모바일 조이스틱 컨트롤 */
+/* Safe Area 변수 설정 */
+:root {
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
+}
+
+/* 모바일 조이스틱 컨트롤 (Safe Area 대응) */
 #mobile-controls {
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 200px;
+    bottom: var(--safe-area-inset-bottom);
+    left: var(--safe-area-inset-left);
+    right: var(--safe-area-inset-right);
+    height: calc(200px + var(--safe-area-inset-bottom));
     pointer-events: none;
     z-index: 1000;
+    padding-bottom: var(--safe-area-inset-bottom);
 }
 
-/* 조이스틱 컨테이너 */
+/* 조이스틱 컨테이너 (Safe Area + 터치 타겟 최적화) */
 #joystick-container {
     position: absolute;
-    bottom: 30px;
-    left: 30px;
-    width: 120px;
-    height: 120px;
+    bottom: max(30px, var(--safe-area-inset-bottom));
+    left: max(30px, var(--safe-area-inset-left));
+    width: max(120px, 44px); /* 최소 44px 터치 타겟 */
+    height: max(120px, 44px);
     pointer-events: auto;
+    touch-action: none;
 }
 
 /* 조이스틱 베이스 */
@@ -235,13 +238,15 @@ body {
     pointer-events: none;
 }
 
-/* 점프 버튼 */
+/* 점프 버튼 (Safe Area + 터치 타겟 최적화) */
 #jump-button {
     position: absolute;
-    bottom: 30px;
-    right: 30px;
-    width: 80px;
-    height: 80px;
+    bottom: max(30px, var(--safe-area-inset-bottom));
+    right: max(30px, var(--safe-area-inset-right));
+    width: max(80px, 44px); /* 최소 44px 터치 타겟 */
+    height: max(80px, 44px);
+    min-width: 44px; /* 접근성 가이드라인 준수 */
+    min-height: 44px;
     border-radius: 50%;
     background: rgba(255, 107, 107, 0.2);
     border: 3px solid rgba(255, 107, 107, 0.4);
@@ -254,6 +259,7 @@ body {
     cursor: pointer;
     transition: all 0.2s ease;
     user-select: none;
+    touch-action: manipulation; /* 더블탭 줌 방지 */
 }
 
 #jump-button:active {
@@ -301,33 +307,101 @@ body {
     }
 }
 
-/* 가로 모드 최적화 */
+/* 가로 모드 최적화 (Safe Area 대응) */
 @media (orientation: landscape) and (max-height: 500px) {
     #mobile-controls {
-        height: 150px;
+        height: calc(150px + var(--safe-area-inset-bottom));
     }
     
     #joystick-container {
-        bottom: 15px;
-        left: 15px;
-        width: 90px;
-        height: 90px;
+        bottom: max(15px, var(--safe-area-inset-bottom));
+        left: max(15px, var(--safe-area-inset-left));
+        width: max(90px, 44px);
+        height: max(90px, 44px);
     }
     
     #joystick-base {
-        width: 90px;
-        height: 90px;
+        width: max(90px, 44px);
+        height: max(90px, 44px);
     }
     
     #joystick-stick {
-        width: 35px;
-        height: 35px;
+        width: max(35px, 18px);
+        height: max(35px, 18px);
     }
     
     #jump-button {
-        bottom: 15px;
-        right: 15px;
-        width: 60px;
-        height: 60px;
+        bottom: max(15px, var(--safe-area-inset-bottom));
+        right: max(15px, var(--safe-area-inset-right));
+        width: max(60px, 44px);
+        height: max(60px, 44px);
+    }
+}
+
+/* iPhone X/11/12 시리즈 대응 */
+@supports (padding: max(0px)) {
+    .mobile-device #mobile-controls {
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+}
+
+/* Android 네비게이션 바 대응 */
+@media screen and (max-height: 700px) {
+    #mobile-controls {
+        height: calc(180px + var(--safe-area-inset-bottom));
+    }
+}
+
+/* 성능 모니터 */
+.performance-monitor {
+    position: absolute;
+    top: max(60px, calc(var(--safe-area-inset-top) + 60px));
+    right: max(20px, var(--safe-area-inset-right));
+    background: rgba(0, 0, 0, 0.7);
+    color: #00ff00;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    padding: 8px 12px;
+    border-radius: 5px;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(0, 255, 0, 0.3);
+    min-width: 120px;
+    z-index: 300;
+    user-select: none;
+    pointer-events: none;
+}
+
+.perf-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2px;
+    line-height: 1.2;
+}
+
+.perf-item:last-child {
+    margin-bottom: 0;
+}
+
+.perf-label {
+    color: #ffffff;
+    margin-right: 8px;
+}
+
+/* 성능 경고 색상 */
+.perf-warning {
+    color: #ffaa00 !important;
+}
+
+.perf-critical {
+    color: #ff4444 !important;
+}
+
+/* 모바일에서 성능 모니터 크기 조정 */
+@media (max-width: 480px) {
+    .performance-monitor {
+        font-size: 10px;
+        padding: 6px 8px;
+        min-width: 100px;
     }
 }

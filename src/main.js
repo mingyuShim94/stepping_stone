@@ -1,30 +1,49 @@
 import "./style.css";
 import FreeMovementGame from "./game/StackGame.js";
 
+// 통합 모바일 감지 함수
+function detectMobile() {
+  const userAgentCheck = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const touchCheck = 'ontouchstart' in window;
+  const maxTouchPointsCheck = navigator.maxTouchPoints > 0;
+  const mediaQueryCheck = window.matchMedia('(max-width: 768px), (hover: none) and (pointer: coarse)').matches;
+  
+  return userAgentCheck || touchCheck || maxTouchPointsCheck || mediaQueryCheck;
+}
+
 // 모바일 최적화 설정
 function setupMobileOptimizations() {
+  const isMobile = detectMobile();
+  
+  // body에 모바일 클래스 추가 (CSS와 연동)
+  if (isMobile) {
+    document.body.classList.add('mobile-device');
+  }
+  
   // 모바일 브라우저에서 스크롤 방지
   document.body.style.overflow = 'hidden';
   document.body.style.position = 'fixed';
   document.body.style.width = '100%';
   document.body.style.height = '100%';
   
-  // 확대/축소 방지
-  document.addEventListener('touchmove', (e) => {
-    if (e.scale !== 1) {
-      e.preventDefault();
-    }
-  }, { passive: false });
-  
-  // 더블탭 확대 방지
-  let lastTouchEnd = 0;
-  document.addEventListener('touchend', (e) => {
-    const now = (new Date()).getTime();
-    if (now - lastTouchEnd <= 300) {
-      e.preventDefault();
-    }
-    lastTouchEnd = now;
-  }, { passive: false });
+  // 확대/축소 방지 (모바일에서만)
+  if (isMobile) {
+    document.addEventListener('touchmove', (e) => {
+      if (e.scale !== 1) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+    
+    // 더블탭 확대 방지
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', (e) => {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, { passive: false });
+  }
   
   // iOS Safari에서 상단/하단 바 숨김
   if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
@@ -34,18 +53,15 @@ function setupMobileOptimizations() {
       }, 500);
     });
   }
+  
+  return isMobile;
 }
 
 // DOM이 로드된 후 게임 초기화
 window.addEventListener("DOMContentLoaded", () => {
   try {
-    // 모바일 최적화 적용
-    setupMobileOptimizations();
-    
-    // 모바일 환경 디버깅 정보 출력
-    const isMobileDetected = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-                            ('ontouchstart' in window) || 
-                            (navigator.maxTouchPoints > 0);
+    // 모바일 최적화 적용 및 모바일 상태 반환
+    const isMobileDetected = setupMobileOptimizations();
     
     console.log('DOM 로드 완료 - 환경 정보:', {
       userAgent: navigator.userAgent,
@@ -53,7 +69,8 @@ window.addEventListener("DOMContentLoaded", () => {
       screenSize: `${window.innerWidth}x${window.innerHeight}`,
       touchSupport: 'ontouchstart' in window,
       maxTouchPoints: navigator.maxTouchPoints,
-      hasPointerEvents: 'onpointerdown' in window
+      hasPointerEvents: 'onpointerdown' in window,
+      mediaQuery: window.matchMedia('(max-width: 768px), (hover: none) and (pointer: coarse)').matches
     });
     
     // 조이스틱 DOM 요소 존재 확인
@@ -71,8 +88,9 @@ window.addEventListener("DOMContentLoaded", () => {
       });
     }, 500);
     
-    // 게임 시작
+    // 게임 시작 (전역 참조 저장)
     const game = new FreeMovementGame();
+    window.currentGame = game;
     
     // 전역 에러 처리
     window.addEventListener('error', (event) => {
