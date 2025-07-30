@@ -84,6 +84,7 @@ class FreeMovementGame {
     this.setupEventListeners();
     this.setupPerformanceMonitor();
     this.setupLoadingProgressUI();
+    this.setupGameOverUI();
     this.animate();
   }
 
@@ -720,16 +721,7 @@ class FreeMovementGame {
     this.gameStats.isPlaying = false; // 점수 계산 중지
     this.gameStats.falls++; // 낙하 횟수 증가
     
-    // 최종 UI 업데이트
-    this.updateGameStatsUI();
-    
-    console.log("플레이어가 다리에서 벗어났습니다!");
-    
-    // 최종 점수 전송 (게임 오버)
-    this.sendFinalScoreToFlutter();
-      
-    // Flutter로 낙하 이벤트 전송
-    this.sendGameEventToFlutter('fall');
+    console.log("💀 플레이어가 다리에서 벗어났습니다!");
     
     // 비명 소리 재생
     if (this.screamSound) {
@@ -738,6 +730,20 @@ class FreeMovementGame {
         console.log('비명 소리 재생 실패');
       });
     }
+    
+    // 최종 UI 업데이트
+    this.updateGameStatsUI();
+    
+    // 최종 점수 전송 (게임 오버)
+    this.sendFinalScoreToFlutter();
+      
+    // Flutter로 낙하 이벤트 전송
+    this.sendGameEventToFlutter('fall');
+    
+    // 1초 후 게임 오버 화면 표시 (추락 애니메이션 시간 확보)
+    setTimeout(() => {
+      this.showGameOver();
+    }, 1000);
   }
 
   respawnPlayer() {
@@ -874,6 +880,14 @@ class FreeMovementGame {
         event.preventDefault();
         this.jump();
       }
+      
+      // ESC 키로 게임 오버 화면 제어
+      if (event.code === "Escape") {
+        event.preventDefault();
+        if (this.gameOverElements.overlay && this.gameOverElements.overlay.classList.contains('show')) {
+          this.continueGame(); // ESC 키로 게임 계속하기
+        }
+      }
     });
 
     window.addEventListener("keyup", (event) => {
@@ -932,6 +946,119 @@ class FreeMovementGame {
     if (this.loadingElements.container) {
       this.loadingElements.container.style.display = 'none';
     }
+  }
+
+  // 게임 오버 UI 설정
+  setupGameOverUI() {
+    this.gameOverElements = {
+      overlay: document.getElementById('game-over'),
+      finalScore: document.getElementById('final-score'),
+      finalDistance: document.getElementById('final-distance'),
+      finalJumps: document.getElementById('final-jumps'),
+      finalTime: document.getElementById('final-time'),
+      restartButton: document.getElementById('restart-button'),
+      continueButton: document.getElementById('continue-button')
+    };
+
+    // 다시하기 버튼 이벤트
+    if (this.gameOverElements.restartButton) {
+      this.gameOverElements.restartButton.addEventListener('click', () => {
+        this.restartFromGameOver();
+      });
+    }
+
+    // 계속하기 버튼 이벤트 (현재 위치에서 다시 시작)
+    if (this.gameOverElements.continueButton) {
+      this.gameOverElements.continueButton.addEventListener('click', () => {
+        this.continueGame();
+      });
+    }
+  }
+
+  // 게임 오버 화면 표시
+  showGameOver() {
+    if (!this.gameOverElements.overlay) return;
+
+    // 최종 통계 업데이트
+    this.updateFinalStats();
+
+    // 게임 오버 화면 표시
+    this.gameOverElements.overlay.classList.add('show');
+    
+    console.log("💀 게임 오버 화면 표시됨");
+  }
+
+  // 게임 오버 화면 숨기기
+  hideGameOver() {
+    if (this.gameOverElements.overlay) {
+      this.gameOverElements.overlay.classList.remove('show');
+    }
+  }
+
+  // 최종 통계 업데이트
+  updateFinalStats() {
+    const playTime = Math.floor((Date.now() - this.gameStartTime) / 1000);
+
+    if (this.gameOverElements.finalScore) {
+      this.gameOverElements.finalScore.textContent = `${this.gameStats.score}점`;
+    }
+    
+    if (this.gameOverElements.finalDistance) {
+      this.gameOverElements.finalDistance.textContent = `${this.scoreData.maxDistance.toFixed(1)}m`;
+    }
+    
+    if (this.gameOverElements.finalJumps) {
+      this.gameOverElements.finalJumps.textContent = `${this.gameStats.jumps}회`;
+    }
+    
+    if (this.gameOverElements.finalTime) {
+      this.gameOverElements.finalTime.textContent = `${playTime}초`;
+    }
+  }
+
+  // 게임 완전 재시작 (새로 추가된 메서드)
+  restartFromGameOver() {
+    console.log("🔄 게임 오버에서 재시작");
+    
+    // 게임 오버 화면 숨기기
+    this.hideGameOver();
+    
+    // 플레이어 위치 초기화
+    if (this.player) {
+      this.player.position.set(0, this.groundY, 0);
+      this.player.rotation.set(0, 0, 0);
+    }
+    
+    // 게임 상태 완전 초기화
+    this.isFalling = false;
+    this.isJumping = false;
+    this.jumpVelocity = 0;
+    this.gameStats.score = 0;
+    this.gameStats.jumps = 0;
+    this.gameStats.falls = 0;
+    this.gameStats.isPlaying = true;
+    this.gameStartTime = Date.now();
+    
+    // 점수 시스템 초기화
+    this.resetScore();
+    
+    // UI 업데이트
+    this.updateGameStatsUI();
+    
+    console.log("✨ 게임 재시작 완료");
+  }
+
+  // 현재 위치에서 계속하기
+  continueGame() {
+    console.log("▶️ 게임 계속하기");
+    
+    // 게임 오버 화면 숨기기
+    this.hideGameOver();
+    
+    // 시작 위치로 리스폰 (기존 respawnPlayer와 동일)
+    this.respawnPlayer();
+    
+    console.log("🎮 게임 계속하기 완료");
   }
 
   // 성능 모니터 설정

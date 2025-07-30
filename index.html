@@ -47,6 +47,62 @@
                 </div>
                 <div class="loading-details" id="loading-details">잠시만 기다려주세요</div>
             </div>
+
+            <!-- 게임 오버 화면 -->
+            <div id="game-over" class="game-over-overlay">
+                <div class="game-over-modal">
+                    <div class="game-over-header">
+                        <div class="game-over-icon">💀</div>
+                        <div class="game-over-title">게임 오버!</div>
+                        <div class="game-over-subtitle">외나무다리에서 떨어졌습니다</div>
+                    </div>
+                    
+                    <div class="game-over-stats">
+                        <div class="final-stats-title">📊 최종 결과</div>
+                        <div class="final-stats-grid">
+                            <div class="final-stat-item">
+                                <span class="final-stat-icon">🏆</span>
+                                <div class="final-stat-content">
+                                    <span class="final-stat-label">최종 점수</span>
+                                    <span id="final-score" class="final-stat-value">0점</span>
+                                </div>
+                            </div>
+                            <div class="final-stat-item">
+                                <span class="final-stat-icon">📏</span>
+                                <div class="final-stat-content">
+                                    <span class="final-stat-label">최대 거리</span>
+                                    <span id="final-distance" class="final-stat-value">0.0m</span>
+                                </div>
+                            </div>
+                            <div class="final-stat-item">
+                                <span class="final-stat-icon">🦘</span>
+                                <div class="final-stat-content">
+                                    <span class="final-stat-label">총 점프</span>
+                                    <span id="final-jumps" class="final-stat-value">0회</span>
+                                </div>
+                            </div>
+                            <div class="final-stat-item">
+                                <span class="final-stat-icon">⏱️</span>
+                                <div class="final-stat-content">
+                                    <span class="final-stat-label">플레이 시간</span>
+                                    <span id="final-time" class="final-stat-value">0초</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="game-over-actions">
+                        <button id="restart-button" class="restart-btn">
+                            <span class="btn-icon">🔄</span>
+                            <span class="btn-text">다시하기</span>
+                        </button>
+                        <button id="continue-button" class="continue-btn">
+                            <span class="btn-icon">▶️</span>
+                            <span class="btn-text">계속하기</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
             
             <!-- 게임 통계 오버레이 -->
             <div id="game-stats" class="game-stats">
