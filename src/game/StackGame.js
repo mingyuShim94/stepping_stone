@@ -83,6 +83,7 @@ class FreeMovementGame {
     this.init();
     this.setupEventListeners();
     this.setupPerformanceMonitor();
+    this.setupLoadingProgressUI();
     this.animate();
   }
 
@@ -512,14 +513,29 @@ class FreeMovementGame {
 
   createPlayer() {
     const loader = new GLTFLoader();
+    
+    // 모델 로딩 타임아웃 설정 (15초)
+    const loadingTimeout = setTimeout(() => {
+      console.warn("모델 로딩 타임아웃 - 폴백 모델 사용");
+      this.createFallbackPlayer();
+    }, 15000);
 
+    // 우선 폴백 플레이어를 빠르게 생성하여 게임 플레이 가능하게 함
+    this.createFallbackPlayer();
+    
+    // 백그라운드에서 실제 모델 로딩 시도 (성공하면 교체)
     loader.load(
       "/models/Animation_Walking_withSkin.glb",
       (gltf) => {
+        clearTimeout(loadingTimeout);
+        
+        // 기존 폴백 모델 제거
+        if (this.player) {
+          this.scene.remove(this.player);
+        }
+        
         this.player = gltf.scene;
         this.player.position.set(0, 0, 0);
-
-        // 모델 크기 조정 (필요시)
         this.player.scale.set(1, 1, 1);
 
         // 애니메이션 설정
@@ -527,33 +543,102 @@ class FreeMovementGame {
           this.mixer = new THREE.AnimationMixer(this.player);
           this.walkAction = this.mixer.clipAction(gltf.animations[0]);
           this.walkAction.setLoop(THREE.LoopRepeat);
-          console.log("애니메이션 로드 완료:", gltf.animations.length, "개");
+          console.log("✅ 고품질 모델 로드 완료 - 애니메이션:", gltf.animations.length, "개");
         }
 
         this.scene.add(this.player);
-        console.log("모델 로드 완료");
+        console.log("🎭 실제 모델로 교체 완료");
+        
+        // 로딩 UI 숨기기
+        this.hideLoadingProgress();
       },
       (progress) => {
-        console.log(
-          "모델 로딩 중:",
-          Math.round((progress.loaded / progress.total) * 100) + "%"
-        );
+        const percentage = Math.round((progress.loaded / progress.total) * 100);
+        console.log(`📦 모델 로딩 중: ${percentage}% (${Math.round(progress.loaded/1024/1024*100)/100}MB/${Math.round(progress.total/1024/1024*100)/100}MB)`);
+        
+        // 20% 이상 로딩되면 사용자에게 진행 상황 알림
+        if (percentage >= 20) {
+          this.showLoadingProgress(percentage, progress.loaded, progress.total);
+        }
       },
       (error) => {
-        console.error("모델 로딩 실패:", error);
-        // 폴백: 기본 정육면체 생성
-        this.createFallbackPlayer();
+        clearTimeout(loadingTimeout);
+        console.error("❌ 모델 로딩 실패:", error);
+        console.log("🎲 폴백 모델로 게임 계속 진행");
+        
+        // 폴백 모델이 없다면 생성
+        if (!this.player) {
+          this.createFallbackPlayer();
+        }
+        
+        // 로딩 UI 숨기기
+        this.hideLoadingProgress();
       }
     );
   }
 
   createFallbackPlayer() {
-    console.log("폴백 모드: 기본 정육면체 생성");
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshLambertMaterial({ color: 0xff6b6b });
-    this.player = new THREE.Mesh(geometry, material);
+    console.log("🎲 폴백 모드: 기본 캐릭터 생성");
+    
+    // 기존 플레이어가 있다면 제거
+    if (this.player) {
+      this.scene.remove(this.player);
+    }
+    
+    // 더 캐릭터 같은 모양으로 개선된 폴백 모델
+    const playerGroup = new THREE.Group();
+    
+    // 몸통 (직사각형)
+    const bodyGeometry = new THREE.BoxGeometry(0.6, 1.2, 0.4);
+    const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x4a90e2 });
+    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    body.position.y = 0.6;
+    playerGroup.add(body);
+    
+    // 머리 (구)
+    const headGeometry = new THREE.SphereGeometry(0.35, 8, 8);
+    const headMaterial = new THREE.MeshLambertMaterial({ color: 0xfdbcb4 });
+    const head = new THREE.Mesh(headGeometry, headMaterial);
+    head.position.y = 1.5;
+    playerGroup.add(head);
+    
+    // 다리 (2개)
+    const legGeometry = new THREE.BoxGeometry(0.2, 0.8, 0.2);
+    const legMaterial = new THREE.MeshLambertMaterial({ color: 0x2c3e50 });
+    
+    const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+    leftLeg.position.set(-0.15, -0.4, 0);
+    playerGroup.add(leftLeg);
+    
+    const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+    rightLeg.position.set(0.15, -0.4, 0);
+    playerGroup.add(rightLeg);
+    
+    // 팔 (2개)
+    const armGeometry = new THREE.BoxGeometry(0.15, 0.8, 0.15);
+    const armMaterial = new THREE.MeshLambertMaterial({ color: 0xfdbcb4 });
+    
+    const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+    leftArm.position.set(-0.45, 0.4, 0);
+    playerGroup.add(leftArm);
+    
+    const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+    rightArm.position.set(0.45, 0.4, 0);
+    playerGroup.add(rightArm);
+    
+    // 그림자 활성화
+    playerGroup.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+    
+    this.player = playerGroup;
     this.player.position.set(0, 0, 0);
     this.scene.add(this.player);
+    
+    console.log("✨ 개선된 폴백 캐릭터 생성 완료");
   }
 
   updatePlayerMovement() {
@@ -810,6 +895,42 @@ class FreeMovementGame {
     // 조이스틱 이벤트 (모바일)
     if (this.isMobile) {
       this.setupJoystickEvents();
+    }
+  }
+
+  // 로딩 진행률 UI 설정
+  setupLoadingProgressUI() {
+    this.loadingElements = {
+      container: document.getElementById('model-loading'),
+      progressFill: document.getElementById('progress-fill'),
+      details: document.getElementById('loading-details')
+    };
+  }
+
+  // 로딩 진행상황 표시
+  showLoadingProgress(percentage, loaded, total) {
+    if (!this.loadingElements.container) return;
+
+    // 로딩 UI 표시
+    this.loadingElements.container.style.display = 'block';
+    
+    // 진행률 바 업데이트
+    if (this.loadingElements.progressFill) {
+      this.loadingElements.progressFill.style.width = `${percentage}%`;
+    }
+    
+    // 상세 정보 업데이트
+    if (this.loadingElements.details) {
+      const loadedMB = Math.round(loaded / 1024 / 1024 * 100) / 100;
+      const totalMB = Math.round(total / 1024 / 1024 * 100) / 100;
+      this.loadingElements.details.textContent = `${percentage}% (${loadedMB}MB/${totalMB}MB)`;
+    }
+  }
+
+  // 로딩 UI 숨기기
+  hideLoadingProgress() {
+    if (this.loadingElements.container) {
+      this.loadingElements.container.style.display = 'none';
     }
   }
 

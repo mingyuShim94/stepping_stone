@@ -42,6 +42,49 @@ body {
     z-index: 100;
 }
 
+/* 모델 로딩 진행률 표시 */
+#model-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 20px 30px;
+    border-radius: 10px;
+    text-align: center;
+    pointer-events: auto;
+    display: none;
+    z-index: 200;
+}
+
+#model-loading .progress-bar {
+    width: 200px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    margin: 10px 0;
+    overflow: hidden;
+}
+
+#model-loading .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+
+#model-loading .loading-text {
+    font-size: 16px;
+    margin-bottom: 5px;
+}
+
+#model-loading .loading-details {
+    font-size: 12px;
+    color: #ccc;
+}
+
 #score {
     position: absolute;
     top: max(20px, var(--safe-area-inset-top));
