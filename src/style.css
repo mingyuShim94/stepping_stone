@@ -510,3 +510,110 @@ body {
         max-width: 250px;
     }
 }
+
+/* 게임 통계 오버레이 */
+.game-stats {
+    position: absolute;
+    top: max(16px, var(--safe-area-inset-top));
+    right: max(16px, var(--safe-area-inset-right));
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    font-family: 'Arial', sans-serif;
+    font-size: 14px;
+    padding: 12px;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    min-width: 160px;
+    z-index: 250;
+    user-select: none;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.stats-title {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 8px;
+    text-align: center;
+    color: #ffffff;
+}
+
+.stats-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 0;
+    min-height: 20px;
+}
+
+.stat-icon {
+    font-size: 14px;
+    margin-right: 6px;
+    display: inline-block;
+    width: 20px;
+    text-align: center;
+}
+
+.stat-label {
+    color: #cccccc;
+    font-size: 12px;
+    margin-right: 8px;
+    flex: 1;
+}
+
+.stat-value {
+    color: #ffffff;
+    font-weight: bold;
+    font-size: 12px;
+    text-align: right;
+}
+
+/* 점수 값 강조 */
+#score-value {
+    color: #ffaa00;
+    font-size: 14px;
+}
+
+/* 거리 값 강조 */
+#distance-value {
+    color: #00ff88;
+}
+
+/* 모바일에서 게임 통계 크기 조정 */
+@media (max-width: 480px) {
+    .game-stats {
+        font-size: 12px;
+        padding: 10px;
+        min-width: 140px;
+        top: max(12px, var(--safe-area-inset-top));
+        right: max(12px, var(--safe-area-inset-right));
+    }
+    
+    .stats-title {
+        font-size: 14px;
+    }
+    
+    .stat-icon {
+        font-size: 12px;
+        width: 18px;
+    }
+    
+    .stat-label {
+        font-size: 11px;
+    }
+    
+    .stat-value {
+        font-size: 11px;
+    }
+    
+    #score-value {
+        font-size: 12px;
+    }
+}

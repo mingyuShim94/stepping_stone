@@ -635,6 +635,9 @@ class FreeMovementGame {
     this.gameStats.isPlaying = false; // 점수 계산 중지
     this.gameStats.falls++; // 낙하 횟수 증가
     
+    // 최종 UI 업데이트
+    this.updateGameStatsUI();
+    
     console.log("플레이어가 다리에서 벗어났습니다!");
     
     // 최종 점수 전송 (게임 오버)
@@ -666,6 +669,9 @@ class FreeMovementGame {
     this.gameStats.isPlaying = true;
     this.resetScore();
     
+    // UI 초기화
+    this.updateGameStatsUI();
+    
     console.log("플레이어가 리스폰되었습니다!");
   }
 
@@ -691,6 +697,10 @@ class FreeMovementGame {
     this.isJumping = true;
     this.jumpVelocity = this.jumpHeight;
     this.gameStats.jumps++; // 점프 횟수 증가
+    
+    // UI 업데이트
+    this.updateGameStatsUI();
+    
     console.log("점프!");
     
     // Flutter로 점프 이벤트 전송
@@ -1632,12 +1642,8 @@ class FreeMovementGame {
         this.gameStats.score = newScore;
         this.gameStats.bestDistance = this.scoreData.maxDistance;
         
-        // Flutter로 실시간 점수 전송 (0.5초마다)
-        const now = Date.now();
-        if (now - this.scoreData.lastScoreUpdate > 500) {
-          this.sendScoreToFlutter();
-          this.scoreData.lastScoreUpdate = now;
-        }
+        // DOM 업데이트 (실시간)
+        this.updateGameStatsUI();
         
         console.log(`🏆 점수 업데이트: ${this.gameStats.score}점 (거리: ${this.scoreData.maxDistance.toFixed(2)})`);
       }
@@ -1645,26 +1651,33 @@ class FreeMovementGame {
   }
 
   /**
-   * Flutter로 실시간 점수 데이터 전송
+   * 게임 통계 UI 실시간 업데이트 (DOM 조작)
    */
-  sendScoreToFlutter() {
-    if (this.isFlutterEnvironment) {
-      try {
-        const scoreData = {
-          score: this.gameStats.score,
-          distance: this.scoreData.maxDistance,
-          jumps: this.gameStats.jumps,
-          playTime: Math.floor((Date.now() - this.gameStartTime) / 1000)
-        };
-
-        // ScoreChannel로도 전송 (직접 점수 업데이트용)
-        FlutterBridge.sendScore(scoreData);
-        
-        // GameEventChannel로도 전송 (이벤트 처리용)
-        FlutterBridge.sendGameEvent('SCORE_UPDATE', scoreData);
-      } catch (error) {
-        console.error('Flutter 점수 전송 오류:', error);
+  updateGameStatsUI() {
+    try {
+      const playTime = Math.floor((Date.now() - this.gameStartTime) / 1000);
+      
+      // DOM 요소 업데이트
+      const scoreElement = document.getElementById('score-value');
+      const distanceElement = document.getElementById('distance-value');
+      const jumpsElement = document.getElementById('jumps-value');
+      const timeElement = document.getElementById('time-value');
+      const deathsElement = document.getElementById('deaths-value');
+      const deathsStat = document.getElementById('deaths-stat');
+      
+      if (scoreElement) scoreElement.textContent = `${this.gameStats.score}점`;
+      if (distanceElement) distanceElement.textContent = `${this.scoreData.maxDistance.toFixed(1)}`;
+      if (jumpsElement) jumpsElement.textContent = `${this.gameStats.jumps}회`;
+      if (timeElement) timeElement.textContent = `${playTime}초`;
+      
+      // 사망 횟수는 0보다 클 때만 표시
+      if (this.gameStats.falls > 0) {
+        if (deathsElement) deathsElement.textContent = `${this.gameStats.falls}회`;
+        if (deathsStat) deathsStat.style.display = 'flex';
       }
+      
+    } catch (error) {
+      console.error('게임 통계 UI 업데이트 오류:', error);
     }
   }
 

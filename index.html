@@ -38,6 +38,38 @@
                 <div class="debug-title">모바일 감지 상태</div>
                 <div id="debug-details">로딩 중...</div>
             </div>
+            
+            <!-- 게임 통계 오버레이 -->
+            <div id="game-stats" class="game-stats">
+                <div class="stats-title">📊 게임 통계</div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-icon">🏆</span>
+                        <span class="stat-label">점수</span>
+                        <span id="score-value" class="stat-value">0점</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-icon">📏</span>
+                        <span class="stat-label">거리</span>
+                        <span id="distance-value" class="stat-value">0.0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-icon">🦘</span>
+                        <span class="stat-label">점프</span>
+                        <span id="jumps-value" class="stat-value">0회</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-icon">⏱️</span>
+                        <span class="stat-label">시간</span>
+                        <span id="time-value" class="stat-value">0초</span>
+                    </div>
+                    <div class="stat-item" id="deaths-stat" style="display: none;">
+                        <span class="stat-icon">💀</span>
+                        <span class="stat-label">사망</span>
+                        <span id="deaths-value" class="stat-value">0회</span>
+                    </div>
+                </div>
+            </div>
         </div>
         <canvas id="gameCanvas"></canvas>
         
