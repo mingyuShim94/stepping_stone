@@ -1,5 +1,6 @@
 import "./style.css";
 import FreeMovementGame from "./game/StackGame.js";
+import { FlutterBridge } from "./flutter/FlutterBridge.js";
 
 // MDN 권장 방식의 모바일 감지 함수
 function detectMobile() {
@@ -116,8 +117,30 @@ window.addEventListener("DOMContentLoaded", () => {
       });
     }, 500);
     
+    // Flutter 환경 확인 및 브리지 초기화
+    const isFlutterEnvironment = FlutterBridge.isFlutterEnvironment();
+    console.log('Flutter 환경 감지:', isFlutterEnvironment);
+    console.log('Flutter 채널 상태:', FlutterBridge.getChannelStatus());
+    
+    if (isFlutterEnvironment) {
+      // Flutter 메시지 리스너 설정
+      FlutterBridge.onFlutterMessage((data) => {
+        console.log('Flutter 메시지 수신:', data);
+        if (window.currentGame) {
+          window.currentGame.handleFlutterMessage(data);
+        }
+      });
+      
+      // 게임 준비 상태 알림
+      FlutterBridge.notifyGameReady({
+        gameType: 'stepping-stone',
+        version: '1.0.0',
+        features: ['webgl', '3d', 'audio', 'mobile-controls']
+      });
+    }
+    
     // 게임 시작 (전역 참조 저장)
-    const game = new FreeMovementGame();
+    const game = new FreeMovementGame(isFlutterEnvironment);
     window.currentGame = game;
     
     // 전역 에러 처리

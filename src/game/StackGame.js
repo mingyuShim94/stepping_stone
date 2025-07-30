@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { FlutterBridge } from "../flutter/FlutterBridge.js";
 
 class FreeMovementGame {
-  constructor() {
+  constructor(isFlutterEnvironment = false) {
     this.scene = null;
     this.camera = null;
     this.renderer = null;
@@ -50,6 +51,26 @@ class FreeMovementGame {
 
     // 모바일 감지
     this.isMobile = this.detectMobile();
+
+    // Flutter 통신 관련
+    this.isFlutterEnvironment = isFlutterEnvironment;
+    this.gameStats = {
+      score: 0,
+      bestDistance: 0,
+      jumps: 0,
+      falls: 0,
+      playTime: 0,
+      isPlaying: true
+    };
+    this.gameStartTime = Date.now();
+    
+    // 점수 계산 관련 변수
+    this.scoreData = {
+      startPosition: 0, // 게임 시작 지점
+      maxDistance: 0,   // 최대 도달한 거리
+      lastScoreUpdate: 0, // 마지막 점수 업데이트 시간
+      scoreMultiplier: 10 // 거리 1당 10점
+    };
 
     // 성능 모니터링 변수
     this.performanceMonitor = {
@@ -577,6 +598,9 @@ class FreeMovementGame {
       }
     }
 
+    // 점수 계산 (플레이어가 앞으로 이동할 때)
+    this.updateScore();
+
     // 다리 위에 있는지 체크
     this.checkBridgeCollision();
 
@@ -608,7 +632,16 @@ class FreeMovementGame {
 
   startNaturalFalling() {
     this.isFalling = true;
+    this.gameStats.isPlaying = false; // 점수 계산 중지
+    this.gameStats.falls++; // 낙하 횟수 증가
+    
     console.log("플레이어가 다리에서 벗어났습니다!");
+    
+    // 최종 점수 전송 (게임 오버)
+    this.sendFinalScoreToFlutter();
+      
+    // Flutter로 낙하 이벤트 전송
+    this.sendGameEventToFlutter('fall');
     
     // 비명 소리 재생
     if (this.screamSound) {
@@ -628,6 +661,10 @@ class FreeMovementGame {
     this.isFalling = false;
     this.jumpVelocity = 0;
     this.isJumping = false;
+    
+    // 점수 시스템 재시작
+    this.gameStats.isPlaying = true;
+    this.resetScore();
     
     console.log("플레이어가 리스폰되었습니다!");
   }
@@ -653,7 +690,11 @@ class FreeMovementGame {
 
     this.isJumping = true;
     this.jumpVelocity = this.jumpHeight;
+    this.gameStats.jumps++; // 점프 횟수 증가
     console.log("점프!");
+    
+    // Flutter로 점프 이벤트 전송
+    this.sendGameEventToFlutter('jump');
     
     // 점프 웃음 소리 재생
     this.playLaughSound();
@@ -1366,6 +1407,298 @@ class FreeMovementGame {
       };
     }
     return null;
+  }
+
+  // Flutter 통신 메서드들
+  
+  /// Flutter에서 오는 메시지 처리
+  handleFlutterMessage(data) {
+    console.log('게임에서 Flutter 메시지 처리:', data);
+    
+    try {
+      if (data.type === 'GAME_CONTROL') {
+        this.handleGameControl(data.command, data.params);
+      } else if (data.type === 'SETTINGS_UPDATE') {
+        this.handleSettingsUpdate(data.settings);
+      }
+    } catch (error) {
+      console.error('Flutter 메시지 처리 오류:', error);
+      if (this.isFlutterEnvironment) {
+        FlutterBridge.sendError('MESSAGE_HANDLE_ERROR', error.message, { originalData: data });
+      }
+    }
+  }
+
+  /// 게임 제어 명령 처리
+  handleGameControl(command, params = {}) {
+    console.log('게임 제어 명령:', command, params);
+    
+    switch (command) {
+      case 'RESTART':
+        this.restartGame();
+        break;
+      case 'PAUSE':
+        this.pauseGame();
+        break;
+      case 'RESUME':
+        this.resumeGame();
+        break;
+      case 'MUTE_AUDIO':
+        this.muteAudio(params.mute || true);
+        break;
+      case 'SET_VOLUME':
+        this.setVolume(params.volume || 0.5);
+        break;
+      default:
+        console.warn('알 수 없는 게임 제어 명령:', command);
+    }
+  }
+
+  /// 설정 업데이트 처리
+  handleSettingsUpdate(settings) {
+    console.log('게임 설정 업데이트:', settings);
+    
+    if (settings.audioEnabled !== undefined) {
+      this.muteAudio(!settings.audioEnabled);
+    }
+    
+    if (settings.volume !== undefined) {
+      this.setVolume(settings.volume);
+    }
+    
+    if (settings.performanceMode !== undefined) {
+      this.setPerformanceMode(settings.performanceMode);
+    }
+  }
+
+  /// 게임 재시작
+  restartGame() {
+    console.log('게임 재시작');
+    
+    // 플레이어 위치 초기화
+    if (this.player) {
+      this.player.position.set(0, this.groundY, 0);
+      this.player.rotation.y = 0;
+    }
+    
+    // 게임 상태 초기화
+    this.isFalling = false;
+    this.isJumping = false;
+    this.jumpVelocity = 0;
+    this.gameStats.score = 0;
+    this.gameStats.jumps = 0;
+    this.gameStats.falls = 0;
+    this.gameStats.isPlaying = true;
+    this.gameStartTime = Date.now();
+    
+    if (this.isFlutterEnvironment) {
+      FlutterBridge.sendGameStatus(FlutterBridge.GAME_STATUS.RESTART);
+      FlutterBridge.sendScore(0);
+    }
+  }
+
+  /// 게임 일시정지
+  pauseGame() {
+    console.log('게임 일시정지');
+    this.gameStats.isPlaying = false;
+    
+    if (this.isFlutterEnvironment) {
+      FlutterBridge.sendGameStatus(FlutterBridge.GAME_STATUS.PAUSED);
+    }
+  }
+
+  /// 게임 재개
+  resumeGame() {
+    console.log('게임 재개');
+    this.gameStats.isPlaying = true;
+    
+    if (this.isFlutterEnvironment) {
+      FlutterBridge.sendGameStatus(FlutterBridge.GAME_STATUS.PLAYING);
+    }
+  }
+
+  /// 오디오 음소거
+  muteAudio(mute) {
+    if (this.bgMusic) {
+      this.bgMusic.muted = mute;
+    }
+    if (this.screamSound) {
+      this.screamSound.muted = mute;
+    }
+    console.log('오디오 음소거:', mute);
+  }
+
+  /// 볼륨 설정
+  setVolume(volume) {
+    const vol = Math.max(0, Math.min(1, volume));
+    if (this.bgMusic) {
+      this.bgMusic.volume = vol;
+    }
+    if (this.screamSound) {
+      this.screamSound.volume = vol;
+    }
+    console.log('볼륨 설정:', vol);
+  }
+
+  /// 성능 모드 설정
+  setPerformanceMode(mode) {
+    console.log('성능 모드 설정:', mode);
+    
+    switch (mode) {
+      case 'high':
+        // 고품질 설정
+        if (this.renderer) {
+          this.renderer.shadowMap.enabled = true;
+          this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        }
+        break;
+      case 'medium':
+        // 중간 품질 설정
+        if (this.renderer) {
+          this.renderer.shadowMap.enabled = true;
+          this.renderer.setPixelRatio(1);
+        }
+        break;
+      case 'low':
+        // 저품질 설정
+        if (this.renderer) {
+          this.renderer.shadowMap.enabled = false;
+          this.renderer.setPixelRatio(1);
+        }
+        break;
+    }
+  }
+
+  /// Flutter로 게임 이벤트 전송
+  sendGameEventToFlutter(eventType, data = {}) {
+    if (!this.isFlutterEnvironment) return;
+    
+    try {
+      switch (eventType) {
+        case 'jump':
+          this.gameStats.jumps++;
+          FlutterBridge.sendPlayerAction(FlutterBridge.PLAYER_ACTIONS.JUMP, {
+            position: this.player ? this.player.position : null,
+            jumps: this.gameStats.jumps
+          });
+          break;
+          
+        case 'fall':
+          this.gameStats.falls++;
+          FlutterBridge.sendPlayerAction(FlutterBridge.PLAYER_ACTIONS.FALL, {
+            position: this.player ? this.player.position : null,
+            falls: this.gameStats.falls
+          });
+          break;
+          
+        case 'score':
+          this.gameStats.score = data.score || this.gameStats.score;
+          FlutterBridge.sendScore(this.gameStats.score);
+          break;
+          
+        case 'statistics':
+          this.gameStats.playTime = Date.now() - this.gameStartTime;
+          FlutterBridge.sendStatistics({
+            ...this.gameStats,
+            fps: this.performanceMonitor.fps
+          });
+          break;
+      }
+    } catch (error) {
+      console.error('Flutter 이벤트 전송 오류:', error);
+      FlutterBridge.sendError('EVENT_SEND_ERROR', error.message, { eventType, data });
+    }
+  }
+
+  /**
+   * 거리 기반 점수 계산 및 업데이트
+   */
+  updateScore() {
+    if (!this.player || !this.gameStats.isPlaying) return;
+
+    // 플레이어의 현재 Z 위치를 기준으로 거리 계산
+    // Z축이 음수 방향으로 갈수록 앞으로 이동하는 것으로 간주
+    const currentDistance = Math.abs(this.player.position.z - this.scoreData.startPosition);
+    
+    // 최대 거리 업데이트 (뒤로 가도 점수는 감소하지 않음)
+    if (currentDistance > this.scoreData.maxDistance) {
+      this.scoreData.maxDistance = currentDistance;
+      
+      // 거리 기반 점수 계산 (거리 * 배율)
+      const newScore = Math.floor(this.scoreData.maxDistance * this.scoreData.scoreMultiplier);
+      
+      // 점수가 실제로 증가했을 때만 업데이트
+      if (newScore > this.gameStats.score) {
+        this.gameStats.score = newScore;
+        this.gameStats.bestDistance = this.scoreData.maxDistance;
+        
+        // Flutter로 실시간 점수 전송 (0.5초마다)
+        const now = Date.now();
+        if (now - this.scoreData.lastScoreUpdate > 500) {
+          this.sendScoreToFlutter();
+          this.scoreData.lastScoreUpdate = now;
+        }
+        
+        console.log(`🏆 점수 업데이트: ${this.gameStats.score}점 (거리: ${this.scoreData.maxDistance.toFixed(2)})`);
+      }
+    }
+  }
+
+  /**
+   * Flutter로 실시간 점수 데이터 전송
+   */
+  sendScoreToFlutter() {
+    if (this.isFlutterEnvironment) {
+      try {
+        FlutterBridge.sendGameEvent('SCORE_UPDATE', {
+          score: this.gameStats.score,
+          distance: this.scoreData.maxDistance,
+          jumps: this.gameStats.jumps,
+          playTime: Math.floor((Date.now() - this.gameStartTime) / 1000)
+        });
+      } catch (error) {
+        console.error('Flutter 점수 전송 오류:', error);
+      }
+    }
+  }
+
+  /**
+   * 게임 시작 시 점수 초기화
+   */
+  resetScore() {
+    this.gameStats.score = 0;
+    this.gameStats.bestDistance = 0;
+    this.scoreData.startPosition = this.player ? this.player.position.z : 0;
+    this.scoreData.maxDistance = 0;
+    this.scoreData.lastScoreUpdate = 0;
+    this.gameStartTime = Date.now();
+    
+    console.log('🔄 점수 시스템 초기화됨');
+  }
+
+  /**
+   * 게임 오버 시 최종 점수 전송
+   */
+  sendFinalScoreToFlutter() {
+    const finalStats = {
+      finalScore: this.gameStats.score,
+      bestDistance: this.scoreData.maxDistance,
+      jumps: this.gameStats.jumps,
+      falls: this.gameStats.falls,
+      playTime: Math.floor((Date.now() - this.gameStartTime) / 1000),
+      sessionId: Date.now()
+    };
+
+    if (this.isFlutterEnvironment) {
+      try {
+        FlutterBridge.sendGameEvent('GAME_OVER', finalStats);
+        console.log('🎮 최종 점수 Flutter 전송:', finalStats);
+      } catch (error) {
+        console.error('Flutter 최종 점수 전송 오류:', error);
+      }
+    }
+
+    return finalStats;
   }
 
 }
