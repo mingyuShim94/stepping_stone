@@ -80,6 +80,17 @@ class FreeMovementGame {
       enabled: false
     };
 
+    // 게임 초기화 시 Flutter 환경 확인
+    console.log('🎮 게임 초기화 - Flutter 환경 상태:', {
+      constructor_param: isFlutterEnvironment,
+      realtime_check: FlutterBridge.isFlutterEnvironment(),
+      window_channels: {
+        GameEventChannel: !!window.GameEventChannel,
+        GameStatusChannel: !!window.GameStatusChannel,
+        ScoreChannel: !!window.ScoreChannel
+      }
+    });
+
     this.init();
     this.setupEventListeners();
     this.setupPerformanceMonitor();
@@ -2075,13 +2086,37 @@ class FreeMovementGame {
       sessionId: Date.now()
     };
 
-    if (this.isFlutterEnvironment) {
+    // 디버깅용 상세 로그
+    console.log('📱 Flutter 전송 시도 - 환경 상태:', {
+      isFlutterEnvironment: this.isFlutterEnvironment,
+      hasGameEventChannel: !!window.GameEventChannel,
+      hasGameStatusChannel: !!window.GameStatusChannel,
+      windowChannels: {
+        GameEventChannel: typeof window.GameEventChannel,
+        GameStatusChannel: typeof window.GameStatusChannel,
+        ScoreChannel: typeof window.ScoreChannel
+      }
+    });
+
+    // Flutter 환경 재확인 (실시간)
+    const currentFlutterStatus = FlutterBridge.isFlutterEnvironment();
+    console.log('🔄 실시간 Flutter 환경 확인:', currentFlutterStatus);
+
+    if (this.isFlutterEnvironment || currentFlutterStatus) {
       try {
         FlutterBridge.sendGameEvent('GAME_OVER', finalStats);
-        console.log('🎮 최종 점수 Flutter 전송:', finalStats);
+        console.log('🎮 최종 점수 Flutter 전송 성공:', finalStats);
       } catch (error) {
-        console.error('Flutter 최종 점수 전송 오류:', error);
+        console.error('❌ Flutter 최종 점수 전송 오류:', error);
+        console.log('🔧 전송 실패 상세:', {
+          error: error.message,
+          stack: error.stack,
+          finalStats
+        });
       }
+    } else {
+      console.warn('⚠️ Flutter 환경 미감지 - 전송 생략');
+      console.log('📊 게임 결과 (Flutter 미전송):', finalStats);
     }
 
     return finalStats;
