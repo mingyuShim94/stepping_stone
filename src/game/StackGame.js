@@ -952,17 +952,25 @@ class FreeMovementGame {
   setupGameOverUI() {
     this.gameOverElements = {
       overlay: document.getElementById('game-over'),
+      modal: document.querySelector('.game-over-modal'),
       finalScore: document.getElementById('final-score'),
       finalDistance: document.getElementById('final-distance'),
       finalJumps: document.getElementById('final-jumps'),
       finalTime: document.getElementById('final-time'),
       restartButton: document.getElementById('restart-button'),
-      continueButton: document.getElementById('continue-button')
+      continueButton: document.getElementById('continue-button'),
+      closeButton: document.getElementById('close-game-over')
     };
 
     // 다시하기 버튼 이벤트
     if (this.gameOverElements.restartButton) {
       this.gameOverElements.restartButton.addEventListener('click', () => {
+        this.restartFromGameOver();
+      });
+      
+      // 터치 이벤트도 추가 (모바일 최적화)
+      this.gameOverElements.restartButton.addEventListener('touchend', (e) => {
+        e.preventDefault();
         this.restartFromGameOver();
       });
     }
@@ -972,7 +980,61 @@ class FreeMovementGame {
       this.gameOverElements.continueButton.addEventListener('click', () => {
         this.continueGame();
       });
+      
+      // 터치 이벤트도 추가 (모바일 최적화)
+      this.gameOverElements.continueButton.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        this.continueGame();
+      });
     }
+
+    // 모바일 전용 닫기 버튼 이벤트
+    if (this.gameOverElements.closeButton) {
+      // 클릭 이벤트
+      this.gameOverElements.closeButton.addEventListener('click', () => {
+        this.continueGame();
+      });
+      
+      // 터치 이벤트 (모바일에서 더 반응성 좋음)
+      this.gameOverElements.closeButton.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.continueGame();
+      });
+    }
+
+    // 배경 터치로 게임 계속하기 (모바일 편의성)
+    if (this.gameOverElements.overlay) {
+      this.gameOverElements.overlay.addEventListener('click', (e) => {
+        // 모달 내부 클릭은 무시
+        if (e.target === this.gameOverElements.overlay) {
+          this.continueGame();
+        }
+      });
+      
+      // 터치 이벤트도 추가
+      this.gameOverElements.overlay.addEventListener('touchend', (e) => {
+        // 모달 내부 터치는 무시
+        if (e.target === this.gameOverElements.overlay) {
+          e.preventDefault();
+          this.continueGame();
+        }
+      });
+    }
+
+    // 모달 내부 클릭/터치 이벤트 전파 방지
+    if (this.gameOverElements.modal) {
+      this.gameOverElements.modal.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+      
+      this.gameOverElements.modal.addEventListener('touchend', (e) => {
+        e.stopPropagation();
+      });
+    }
+
+    // 스와이프 제스처 지원 (모바일)
+    this.setupGameOverSwipeGestures();
   }
 
   // 게임 오버 화면 표시
@@ -1059,6 +1121,63 @@ class FreeMovementGame {
     this.respawnPlayer();
     
     console.log("🎮 게임 계속하기 완료");
+  }
+
+  // 게임 오버 화면 스와이프 제스처 설정
+  setupGameOverSwipeGestures() {
+    if (!this.gameOverElements.overlay) return;
+
+    let startY = 0;
+    let startX = 0;
+    let isSwipeActive = false;
+
+    // 터치 시작
+    this.gameOverElements.overlay.addEventListener('touchstart', (e) => {
+      if (e.target !== this.gameOverElements.overlay) return;
+      
+      const touch = e.touches[0];
+      startY = touch.clientY;
+      startX = touch.clientX;
+      isSwipeActive = true;
+    }, { passive: true });
+
+    // 터치 이동
+    this.gameOverElements.overlay.addEventListener('touchmove', (e) => {
+      if (!isSwipeActive || e.target !== this.gameOverElements.overlay) return;
+      
+      // 스크롤 방지
+      e.preventDefault();
+    }, { passive: false });
+
+    // 터치 종료
+    this.gameOverElements.overlay.addEventListener('touchend', (e) => {
+      if (!isSwipeActive || e.target !== this.gameOverElements.overlay) return;
+      
+      const touch = e.changedTouches[0];
+      const endY = touch.clientY;
+      const endX = touch.clientX;
+      
+      const deltaY = endY - startY;
+      const deltaX = endX - startX;
+      
+      // 스와이프 거리 임계값 (50px)
+      const threshold = 50;
+      
+      // 세로 스와이프가 가로 스와이프보다 큰 경우만 처리
+      if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > threshold) {
+        if (deltaY < 0) {
+          // 위로 스와이프 - 다시하기
+          console.log("📱 위로 스와이프 - 다시하기");
+          this.restartFromGameOver();
+        } else {
+          // 아래로 스와이프 - 계속하기
+          console.log("📱 아래로 스와이프 - 계속하기");
+          this.continueGame();
+        }
+      }
+      
+      isSwipeActive = false;
+    }, { passive: true });
   }
 
   // 성능 모니터 설정

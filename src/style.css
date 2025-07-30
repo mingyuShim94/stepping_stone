@@ -301,19 +301,110 @@ body {
     font-size: 16px;
 }
 
+/* 모바일 전용 닫기 버튼 */
+.close-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(231, 76, 60, 0.9);
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1001;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.close-btn:hover {
+    background: rgba(192, 57, 43, 0.9);
+    transform: scale(1.1);
+}
+
+.close-btn:active {
+    transform: scale(0.95);
+    background: rgba(169, 50, 38, 0.9);
+}
+
+/* 모바일 힌트 텍스트 */
+.mobile-hint {
+    font-size: 14px;
+    color: #95a5a6;
+    margin-top: 8px;
+    font-style: italic;
+    text-align: center;
+}
+
+/* 데스크톱에서는 힌트 숨기기 */
+@media (min-width: 769px) {
+    .mobile-hint {
+        display: none;
+    }
+}
+
+/* 게임 오버 오버레이 터치 개선 */
+.game-over-overlay {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+}
+
 /* 모바일 최적화 */
 @media (max-width: 480px) {
     .game-over-modal {
-        padding: 20px;
+        padding: 25px 20px 20px 20px;
         border-radius: 15px;
+        margin: 10px;
+        max-height: 85vh;
+        position: relative;
+    }
+    
+    .close-btn {
+        top: 10px;
+        right: 10px;
+        width: 35px;
+        height: 35px;
+        font-size: 18px;
     }
     
     .game-over-icon {
         font-size: 50px;
+        margin-bottom: 15px;
     }
     
     .game-over-title {
         font-size: 24px;
+        margin-bottom: 8px;
+    }
+    
+    .game-over-subtitle {
+        font-size: 14px;
+        margin-bottom: 5px;
+    }
+    
+    .mobile-hint {
+        font-size: 12px;
+        margin-bottom: 15px;
+    }
+    
+    .game-over-stats {
+        margin-bottom: 20px;
+    }
+    
+    .final-stats-title {
+        font-size: 16px;
+        margin-bottom: 12px;
     }
     
     .final-stats-grid {
@@ -323,15 +414,82 @@ body {
     
     .final-stat-item {
         padding: 12px;
+        border-radius: 8px;
+    }
+    
+    .final-stat-icon {
+        font-size: 20px;
+    }
+    
+    .final-stat-label {
+        font-size: 11px;
+    }
+    
+    .final-stat-value {
+        font-size: 14px;
     }
     
     .game-over-actions {
         flex-direction: column;
+        gap: 12px;
+    }
+    
+    .restart-btn, .continue-btn {
+        padding: 15px 20px;
+        font-size: 16px;
+        border-radius: 10px;
+        min-height: 50px;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+    }
+    
+    .btn-icon {
+        font-size: 16px;
+    }
+    
+    .btn-text {
+        font-size: 16px;
+        font-weight: bold;
+    }
+}
+
+/* 매우 작은 화면 (아이폰 SE 등) */
+@media (max-width: 375px) {
+    .game-over-modal {
+        padding: 20px 15px 15px 15px;
+        margin: 5px;
+    }
+    
+    .final-stats-grid {
+        gap: 8px;
+    }
+    
+    .final-stat-item {
+        padding: 10px;
     }
     
     .restart-btn, .continue-btn {
         padding: 12px 16px;
-        font-size: 14px;
+        font-size: 15px;
+        min-height: 45px;
+    }
+}
+
+/* 태블릿 최적화 */
+@media (min-width: 481px) and (max-width: 768px) {
+    .game-over-modal {
+        max-width: 500px;
+        padding: 30px 25px;
+    }
+    
+    .final-stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+    
+    .game-over-actions {
+        flex-direction: row;
+        gap: 15px;
     }
 }
 

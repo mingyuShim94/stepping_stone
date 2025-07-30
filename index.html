@@ -51,10 +51,19 @@
             <!-- 게임 오버 화면 -->
             <div id="game-over" class="game-over-overlay">
                 <div class="game-over-modal">
+                    <!-- 모바일 전용 닫기 버튼 -->
+                    <button id="close-game-over" class="close-btn mobile-only" title="게임 계속하기">
+                        <span>✕</span>
+                    </button>
+                    
                     <div class="game-over-header">
                         <div class="game-over-icon">💀</div>
                         <div class="game-over-title">게임 오버!</div>
                         <div class="game-over-subtitle">외나무다리에서 떨어졌습니다</div>
+                        <div class="mobile-hint">
+                            📱 터치: 화면 탭으로 계속하기<br>
+                            📝 스와이프: ↑위로(다시하기) / ↓아래로(계속하기)
+                        </div>
                     </div>
                     
                     <div class="game-over-stats">
