@@ -34,10 +34,12 @@ export class FlutterBridge {
 
     /**
      * Flutter WebView로 점수 전송
-     * @param {number} score - 게임 점수
+     * @param {number|Object} score - 게임 점수 또는 점수 데이터 객체
      */
     static sendScore(score) {
-        this.sendMessage(this.EVENT_TYPES.SCORE, { score });
+        // 숫자인 경우 점수만 전송, 객체인 경우 전체 데이터 전송
+        const scoreData = typeof score === 'number' ? { score } : score;
+        this.sendMessage(this.EVENT_TYPES.SCORE, scoreData);
     }
 
     /**

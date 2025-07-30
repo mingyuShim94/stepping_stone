@@ -1650,12 +1650,18 @@ class FreeMovementGame {
   sendScoreToFlutter() {
     if (this.isFlutterEnvironment) {
       try {
-        FlutterBridge.sendGameEvent('SCORE_UPDATE', {
+        const scoreData = {
           score: this.gameStats.score,
           distance: this.scoreData.maxDistance,
           jumps: this.gameStats.jumps,
           playTime: Math.floor((Date.now() - this.gameStartTime) / 1000)
-        });
+        };
+
+        // ScoreChannel로도 전송 (직접 점수 업데이트용)
+        FlutterBridge.sendScore(scoreData);
+        
+        // GameEventChannel로도 전송 (이벤트 처리용)
+        FlutterBridge.sendGameEvent('SCORE_UPDATE', scoreData);
       } catch (error) {
         console.error('Flutter 점수 전송 오류:', error);
       }
